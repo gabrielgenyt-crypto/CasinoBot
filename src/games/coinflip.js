@@ -1,5 +1,6 @@
 const { getNextResult } = require('../utils/provablyFair');
 const { updateBalance, getBalance, recordGame } = require('../utils/wallet');
+const { addWagered } = require('../utils/vip');
 
 /**
  * Runs a coinflip game for the given user.
@@ -33,7 +34,9 @@ const playCoinflip = (userId, bet, choice) => {
     side, choice,
   }));
 
-  return { won, side, payout, newBalance, nonce, serverSeedHash };
+  const vipResult = addWagered(userId, bet);
+
+  return { won, side, payout, newBalance, nonce, serverSeedHash, vipLevelUp: vipResult.newLevel };
 };
 
 module.exports = { playCoinflip };

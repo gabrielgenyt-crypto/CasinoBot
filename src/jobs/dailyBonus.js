@@ -1,12 +1,13 @@
 const cron = require('node-cron');
 const db = require('../utils/database');
 const { fetchPrices } = require('../utils/priceService');
+const { processAutoWithdrawals } = require('../services/withdrawProcessor');
 
 /**
  * Starts all scheduled cron jobs. Called once when the bot is ready.
- * @param {import('discord.js').Client} _client - The Discord.js client.
+ * @param {import('discord.js').Client} client - The Discord.js client.
  */
-const startCronJobs = (_client) => {
+const startCronJobs = (client) => {
   // Midnight UTC: clean expired daily claim records.
   cron.schedule('0 0 * * *', () => {
     const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
@@ -48,6 +49,15 @@ const startCronJobs = (_client) => {
       console.log(`[CRON] Archived ${auditResult.changes} old audit log entries.`);
     }
   }, { timezone: 'UTC' });
+
+  // Every 2 minutes: process auto-withdrawals for small amounts.
+  cron.schedule('*/2 * * * *', async () => {
+    try {
+      await processAutoWithdrawals(client);
+    } catch (error) {
+      console.warn('[CRON] Auto-withdrawal processing failed:', error.message);
+    }
+  });
 
   console.log('[CRON] All scheduled jobs registered.');
 };

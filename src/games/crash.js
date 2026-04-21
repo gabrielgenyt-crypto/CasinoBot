@@ -1,5 +1,6 @@
 const { getNextResult } = require('../utils/provablyFair');
 const { updateBalance, getBalance, recordGame } = require('../utils/wallet');
+const { addWagered } = require('../utils/vip');
 
 // House edge ~3%. The crash point formula ensures the house wins ~3% of rounds
 // instantly (crash at 1.00x).
@@ -58,7 +59,9 @@ const playCrash = (userId, bet, cashout) => {
     crashPoint, cashout,
   }));
 
-  return { won, crashPoint, cashout, payout, newBalance, nonce, serverSeedHash };
+  const vipResult = addWagered(userId, bet);
+
+  return { won, crashPoint, cashout, payout, newBalance, nonce, serverSeedHash, vipLevelUp: vipResult.newLevel };
 };
 
 module.exports = { playCrash, getCrashPoint };
