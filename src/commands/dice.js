@@ -1,56 +1,41 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 const { getBalance, ensureWallet } = require('../utils/wallet');
 const { playDice } = require('../games/dice');
 
-const data = new SlashCommandBuilder()
-  .setName('dice')
-  .setDescription('Roll a dice (1-100). Bet over or under a target number.')
-  .addIntegerOption((opt) =>
-    opt.setName('bet').setDescription('Amount to wager').setRequired(true).setMinValue(1)
-  )
-  .addStringOption((opt) =>
-    opt
-      .setName('direction')
-      .setDescription('Over or under the target')
-      .setRequired(true)
-      .addChoices(
-        { name: 'Over', value: 'over' },
-        { name: 'Under', value: 'under' }
-      )
-  )
-  .addIntegerOption((opt) =>
-    opt
-      .setName('target')
-      .setDescription('Target number (1-99)')
-      .setRequired(true)
-      .setMinValue(1)
-      .setMaxValue(99)
-  );
+const name = 'dice';
+const aliases = ['d'];
+const description = 'Roll a dice (1-100). Usage: =dice <bet> <over|under> <target>';
 
-async function execute(interaction) {
-  const userId = interaction.user.id;
+async function execute(message, args) {
+  const userId = message.author.id;
   ensureWallet(userId);
 
-  const bet = interaction.options.getInteger('bet');
-  const direction = interaction.options.getString('direction');
-  const target = interaction.options.getInteger('target');
-  const balance = getBalance(userId);
-
-  if (bet > balance) {
-    return interaction.reply({
-      content: `Insufficient funds. Your balance: **${balance}**`,
-      ephemeral: true,
-    });
+  if (args.length < 3) {
+    return message.reply('Usage: `=dice <bet> <over|under> <target>`\nExample: `=dice 100 over 50`');
   }
 
-  // Validate the target produces a valid win chance.
-  const winChance =
-    direction === 'over' ? (100 - target) / 100 : (target - 1) / 100;
+  const bet = parseInt(args[0], 10);
+  const direction = args[1].toLowerCase();
+  const target = parseInt(args[2], 10);
+
+  if (isNaN(bet) || bet < 1) {
+    return message.reply('Bet must be a positive number.');
+  }
+  if (!['over', 'under'].includes(direction)) {
+    return message.reply('Direction must be `over` or `under`.');
+  }
+  if (isNaN(target) || target < 1 || target > 99) {
+    return message.reply('Target must be between 1 and 99.');
+  }
+
+  const balance = getBalance(userId);
+  if (bet > balance) {
+    return message.reply(`Insufficient funds. Your balance: **${balance}**`);
+  }
+
+  const winChance = direction === 'over' ? (100 - target) / 100 : (target - 1) / 100;
   if (winChance <= 0 || winChance >= 1) {
-    return interaction.reply({
-      content: 'Invalid target for that direction. Ensure there is a chance to win and lose.',
-      ephemeral: true,
-    });
+    return message.reply('Invalid target for that direction.');
   }
 
   let result;
@@ -58,7 +43,7 @@ async function execute(interaction) {
     result = playDice(userId, bet, direction, target);
   } catch (error) {
     if (error.message === 'INSUFFICIENT_FUNDS') {
-      return interaction.reply({ content: 'Insufficient funds.', ephemeral: true });
+      return message.reply('Insufficient funds.');
     }
     throw error;
   }
@@ -72,21 +57,18 @@ async function execute(interaction) {
   const embed = new EmbedBuilder()
     .setTitle(`Dice - Rolled ${result.roll}`)
     .setDescription(
-      `**${interaction.user.username}** bet **${bet}** on **${direction} ${target}**\n` +
-      `Roll: **${result.roll}** ${result.won ? '>' : '<'} ${target}\n\n` +
-      outcomeText
+      `**${message.author.username}** bet **${bet}** on **${direction} ${target}**\n` +
+      `Roll: **${result.roll}** | ${outcomeText}`
     )
     .setColor(color)
     .addFields(
       { name: 'Multiplier', value: `${result.multiplier}x`, inline: true },
       { name: 'Win Chance', value: `${winChancePercent}%`, inline: true },
-      { name: 'Balance', value: `${result.newBalance}`, inline: true },
-      { name: 'Nonce', value: `${result.nonce}`, inline: true },
-      { name: 'Seed Hash', value: `\`${result.serverSeedHash.substring(0, 16)}...\``, inline: true }
+      { name: 'Balance', value: `${result.newBalance}`, inline: true }
     )
-    .setFooter({ text: 'Provably Fair | /fairness to verify' });
+    .setFooter({ text: 'Provably Fair | =fairness to verify' });
 
-  return interaction.reply({ embeds: [embed] });
+  return message.reply({ embeds: [embed] });
 }
 
-module.exports = { data, execute };
+module.exports = { name, aliases, description, execute };

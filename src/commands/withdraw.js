@@ -1,79 +1,60 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 const db = require('../utils/database');
 const { getBalance, updateBalance, ensureWallet } = require('../utils/wallet');
 const { validateAddress, isBlockedAddress } = require('../utils/addressValidator');
 const { log, ACTIONS } = require('../utils/auditLog');
 
+const name = 'withdraw';
+const aliases = ['wd'];
+const description = 'Withdraw coins. Usage: =withdraw <amount> <chain> <address>';
+
 const SUPPORTED_CHAINS = ['ETH', 'BSC', 'SOL', 'MATIC'];
 const DAILY_LIMIT = 50000;
 const LARGE_WITHDRAWAL_THRESHOLD = 10000;
 
-const data = new SlashCommandBuilder()
-  .setName('withdraw')
-  .setDescription('Withdraw coins to a blockchain address.')
-  .addIntegerOption((opt) =>
-    opt.setName('amount').setDescription('Amount to withdraw').setRequired(true).setMinValue(100)
-  )
-  .addStringOption((opt) =>
-    opt
-      .setName('chain')
-      .setDescription('Blockchain to withdraw on')
-      .setRequired(true)
-      .addChoices(
-        ...SUPPORTED_CHAINS.map((c) => ({ name: c, value: c }))
-      )
-  )
-  .addStringOption((opt) =>
-    opt.setName('address').setDescription('Destination wallet address').setRequired(true)
-  );
-
-async function execute(interaction) {
-  const userId = interaction.user.id;
+async function execute(message, args) {
+  const userId = message.author.id;
   ensureWallet(userId);
 
-  const amount = interaction.options.getInteger('amount');
-  const chain = interaction.options.getString('chain');
-  const rawAddress = interaction.options.getString('address');
-  const balance = getBalance(userId);
+  if (args.length < 3) {
+    return message.reply('Usage: `=withdraw <amount> <chain> <address>`\nExample: `=withdraw 1000 ETH 0x123...`');
+  }
 
-  // Validate the destination address.
+  const amount = parseInt(args[0], 10);
+  const chain = args[1].toUpperCase();
+  const rawAddress = args[2];
+
+  if (isNaN(amount) || amount < 100) {
+    return message.reply('Minimum withdrawal is 100 coins.');
+  }
+  if (!SUPPORTED_CHAINS.includes(chain)) {
+    return message.reply(`Chain must be one of: ${SUPPORTED_CHAINS.join(', ')}`);
+  }
+
   const validation = validateAddress(chain, rawAddress);
   if (!validation.valid) {
-    return interaction.reply({
-      content: `Invalid ${chain} address: ${validation.error}`,
-      ephemeral: true,
-    });
+    return message.reply(`Invalid ${chain} address: ${validation.error}`);
   }
   const address = validation.address;
 
   if (isBlockedAddress(address)) {
-    return interaction.reply({
-      content: 'This address is blocked. Contact support if you believe this is an error.',
-      ephemeral: true,
-    });
+    return message.reply('This address is blocked.');
   }
 
+  const balance = getBalance(userId);
   if (amount > balance) {
-    return interaction.reply({
-      content: `Insufficient funds. Your balance: **${balance}**`,
-      ephemeral: true,
-    });
+    return message.reply(`Insufficient funds. Your balance: **${balance}**`);
   }
 
-  // Check daily withdrawal limit.
   const today = new Date().toISOString().split('T')[0];
   const dailyTotal = db.prepare(
     'SELECT COALESCE(SUM(amount), 0) as total FROM withdraw_requests WHERE user_id = ? AND created_at >= ? AND status != ?'
   ).get(userId, today, 'rejected');
 
   if (dailyTotal.total + amount > DAILY_LIMIT) {
-    return interaction.reply({
-      content: `Daily withdrawal limit is **${DAILY_LIMIT}** coins. You have already requested **${dailyTotal.total}** today.`,
-      ephemeral: true,
-    });
+    return message.reply(`Daily limit is **${DAILY_LIMIT}** coins. Already requested: **${dailyTotal.total}** today.`);
   }
 
-  // Check whitelist (optional -- if user has whitelisted addresses, enforce it).
   const whitelistCount = db.prepare(
     'SELECT COUNT(*) as count FROM withdraw_whitelist WHERE user_id = ?'
   ).get(userId).count;
@@ -82,33 +63,24 @@ async function execute(interaction) {
     const isWhitelisted = db.prepare(
       'SELECT id FROM withdraw_whitelist WHERE user_id = ? AND chain = ? AND address = ?'
     ).get(userId, chain, address);
-
     if (!isWhitelisted) {
-      return interaction.reply({
-        content: 'This address is not on your whitelist. Add it with `/withdraw whitelist` first (24h cooldown applies).',
-        ephemeral: true,
-      });
+      return message.reply('This address is not on your whitelist.');
     }
   }
 
-  // Deduct balance.
   try {
     updateBalance(userId, -amount, `withdrawal request: ${chain}`);
   } catch (error) {
     if (error.message === 'INSUFFICIENT_FUNDS') {
-      return interaction.reply({ content: 'Insufficient funds.', ephemeral: true });
+      return message.reply('Insufficient funds.');
     }
     throw error;
   }
 
-  // Determine if this needs admin approval.
-  const status = amount >= LARGE_WITHDRAWAL_THRESHOLD ? 'pending' : 'pending';
   const needsApproval = amount >= LARGE_WITHDRAWAL_THRESHOLD;
-
-  // Create the withdrawal request.
   const result = db.prepare(
     'INSERT INTO withdraw_requests (user_id, chain, address, amount, status) VALUES (?, ?, ?, ?, ?)'
-  ).run(userId, chain, address, amount, status);
+  ).run(userId, chain, address, amount, 'pending');
 
   log(userId, ACTIONS.WITHDRAW_REQUEST, {
     details: JSON.stringify({ id: result.lastInsertRowid, chain, address, amount, needsApproval }),
@@ -122,12 +94,11 @@ async function execute(interaction) {
       { name: 'Amount', value: `${amount}`, inline: true },
       { name: 'Chain', value: chain, inline: true },
       { name: 'Address', value: `\`${address}\``, inline: false },
-      { name: 'Status', value: needsApproval ? 'Pending Admin Approval (large amount)' : 'Pending Processing', inline: false }
+      { name: 'Status', value: needsApproval ? 'Pending Admin Approval' : 'Pending Processing', inline: false }
     )
-    .setFooter({ text: 'Blockchain transaction integration required for automatic processing.' })
     .setTimestamp();
 
-  return interaction.reply({ embeds: [embed], ephemeral: true });
+  return message.reply({ embeds: [embed] });
 }
 
-module.exports = { data, execute };
+module.exports = { name, aliases, description, execute };

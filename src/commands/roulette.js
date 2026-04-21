@@ -1,65 +1,57 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 const { getBalance, ensureWallet } = require('../utils/wallet');
 const { playRoulette, BET_TYPES } = require('../games/roulette');
 
-// Build choices from BET_TYPES plus a few number examples.
-const betChoices = [
-  ...Object.entries(BET_TYPES).map(([key, val]) => ({
-    name: val.label,
-    value: key,
-  })),
-];
+const name = 'roulette';
+const aliases = ['rl'];
+const description = 'European roulette. Usage: =roulette <bet> <type|number>';
 
-const data = new SlashCommandBuilder()
-  .setName('roulette')
-  .setDescription('European roulette. Bet on colors, numbers, dozens, and more.')
-  .addIntegerOption((opt) =>
-    opt.setName('bet').setDescription('Amount to wager').setRequired(true).setMinValue(1)
-  )
-  .addStringOption((opt) =>
-    opt
-      .setName('type')
-      .setDescription('Bet type (red, black, even, odd, low, high, dozen1-3, col1-3, or a number 0-36)')
-      .setRequired(true)
-      .addChoices(...betChoices.slice(0, 25))
-  )
-  .addIntegerOption((opt) =>
-    opt
-      .setName('number')
-      .setDescription('Straight-up number bet (0-36). Overrides type if provided.')
-      .setRequired(false)
-      .setMinValue(0)
-      .setMaxValue(36)
-  );
+const validTypes = Object.keys(BET_TYPES);
 
-async function execute(interaction) {
-  const userId = interaction.user.id;
+async function execute(message, args) {
+  const userId = message.author.id;
   ensureWallet(userId);
 
-  const bet = interaction.options.getInteger('bet');
-  const numberBet = interaction.options.getInteger('number');
-  const typeBet = interaction.options.getString('type');
-  const balance = getBalance(userId);
-
-  if (bet > balance) {
-    return interaction.reply({
-      content: `Insufficient funds. Your balance: **${balance}**`,
-      ephemeral: true,
-    });
+  if (args.length < 2) {
+    return message.reply(
+      'Usage: `=roulette <bet> <type>`\n' +
+      'Types: `red`, `black`, `even`, `odd`, `low`, `high`, `dozen1-3`, `col1-3`, or a number `0-36`\n' +
+      'Example: `=roulette 100 red`'
+    );
   }
 
-  // If a number is provided, use it as a straight-up bet.
-  const betType = numberBet !== null ? String(numberBet) : typeBet;
+  const bet = parseInt(args[0], 10);
+  const betTypeRaw = args[1].toLowerCase();
+
+  if (isNaN(bet) || bet < 1) {
+    return message.reply('Bet must be a positive number.');
+  }
+
+  const balance = getBalance(userId);
+  if (bet > balance) {
+    return message.reply(`Insufficient funds. Your balance: **${balance}**`);
+  }
+
+  // Determine bet type: number (0-36) or named type.
+  const numBet = parseInt(betTypeRaw, 10);
+  let betType;
+  if (!isNaN(numBet) && numBet >= 0 && numBet <= 36 && String(numBet) === betTypeRaw) {
+    betType = betTypeRaw;
+  } else if (validTypes.includes(betTypeRaw)) {
+    betType = betTypeRaw;
+  } else {
+    return message.reply(`Invalid bet type. Use: ${validTypes.join(', ')}, or a number 0-36.`);
+  }
 
   let result;
   try {
     result = playRoulette(userId, bet, betType);
   } catch (error) {
     if (error.message === 'INSUFFICIENT_FUNDS') {
-      return interaction.reply({ content: 'Insufficient funds.', ephemeral: true });
+      return message.reply('Insufficient funds.');
     }
     if (error.message === 'INVALID_BET_TYPE') {
-      return interaction.reply({ content: 'Invalid bet type.', ephemeral: true });
+      return message.reply('Invalid bet type.');
     }
     throw error;
   }
@@ -73,19 +65,18 @@ async function execute(interaction) {
   const embed = new EmbedBuilder()
     .setTitle(`Roulette - ${colorEmoji[result.color]} ${result.number}`)
     .setDescription(
-      `**${interaction.user.username}** bet **${bet}** on **${result.betLabel}**\n` +
+      `**${message.author.username}** bet **${bet}** on **${result.betLabel}**\n` +
       `The ball landed on **${result.number}** (${result.color})\n\n` +
       outcomeText
     )
     .setColor(color)
     .addFields(
       { name: 'Balance', value: `${result.newBalance}`, inline: true },
-      { name: 'Nonce', value: `${result.nonce}`, inline: true },
-      { name: 'Seed Hash', value: `\`${result.serverSeedHash.substring(0, 16)}...\``, inline: true }
+      { name: 'Nonce', value: `${result.nonce}`, inline: true }
     )
-    .setFooter({ text: 'Provably Fair | /fairness to verify' });
+    .setFooter({ text: 'Provably Fair | =fairness to verify' });
 
-  return interaction.reply({ embeds: [embed] });
+  return message.reply({ embeds: [embed] });
 }
 
-module.exports = { data, execute };
+module.exports = { name, aliases, description, execute };

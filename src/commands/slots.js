@@ -1,26 +1,27 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 const { getBalance, ensureWallet } = require('../utils/wallet');
 const { playSlots } = require('../games/slots');
 
-const data = new SlashCommandBuilder()
-  .setName('slots')
-  .setDescription('Spin the slot machine! Match symbols to win.')
-  .addIntegerOption((opt) =>
-    opt.setName('bet').setDescription('Amount to wager').setRequired(true).setMinValue(1)
-  );
+const name = 'slots';
+const aliases = ['slot', 's'];
+const description = 'Spin the slot machine! Usage: =slots <bet>';
 
-async function execute(interaction) {
-  const userId = interaction.user.id;
+async function execute(message, args) {
+  const userId = message.author.id;
   ensureWallet(userId);
 
-  const bet = interaction.options.getInteger('bet');
-  const balance = getBalance(userId);
+  if (args.length < 1) {
+    return message.reply('Usage: `=slots <bet>`\nExample: `=slots 100`');
+  }
 
+  const bet = parseInt(args[0], 10);
+  if (isNaN(bet) || bet < 1) {
+    return message.reply('Bet must be a positive number.');
+  }
+
+  const balance = getBalance(userId);
   if (bet > balance) {
-    return interaction.reply({
-      content: `Insufficient funds. Your balance: **${balance}**`,
-      ephemeral: true,
-    });
+    return message.reply(`Insufficient funds. Your balance: **${balance}**`);
   }
 
   let result;
@@ -28,7 +29,7 @@ async function execute(interaction) {
     result = playSlots(userId, bet);
   } catch (error) {
     if (error.message === 'INSUFFICIENT_FUNDS') {
-      return interaction.reply({ content: 'Insufficient funds.', ephemeral: true });
+      return message.reply('Insufficient funds.');
     }
     throw error;
   }
@@ -49,18 +50,17 @@ async function execute(interaction) {
     .setTitle('Slots')
     .setDescription(
       `**[ ${reelDisplay} ]**\n\n` +
-      `${interaction.user.username} bet **${bet}** coins\n` +
+      `${message.author.username} bet **${bet}** coins\n` +
       outcomeText
     )
     .setColor(color)
     .addFields(
       { name: 'Balance', value: `${result.newBalance}`, inline: true },
-      { name: 'Nonce', value: `${result.nonce}`, inline: true },
-      { name: 'Seed Hash', value: `\`${result.serverSeedHash.substring(0, 16)}...\``, inline: true }
+      { name: 'Nonce', value: `${result.nonce}`, inline: true }
     )
-    .setFooter({ text: 'Provably Fair | /fairness to verify' });
+    .setFooter({ text: 'Provably Fair | =fairness to verify' });
 
-  return interaction.reply({ embeds: [embed] });
+  return message.reply({ embeds: [embed] });
 }
 
-module.exports = { data, execute };
+module.exports = { name, aliases, description, execute };

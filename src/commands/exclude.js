@@ -1,5 +1,4 @@
 const {
-  SlashCommandBuilder,
   EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
@@ -7,45 +6,21 @@ const {
 } = require('discord.js');
 const db = require('../utils/database');
 
+const name = 'exclude';
+const aliases = ['selfexclude'];
+const description = 'Self-exclusion tools. Usage: =exclude <set|status|help> [duration]';
+
 const HELPLINE_INFO =
-  'If you or someone you know has a gambling problem, please contact:\n' +
+  'If you or someone you know has a gambling problem:\n' +
   '- **National Problem Gambling Helpline:** 1-800-522-4700\n' +
   '- **GamCare:** https://www.gamcare.org.uk\n' +
   '- **Gamblers Anonymous:** https://www.gamblersanonymous.org';
 
-const data = new SlashCommandBuilder()
-  .setName('exclude')
-  .setDescription('Self-exclusion and responsible gambling tools.')
-  .addSubcommand((sub) =>
-    sub
-      .setName('set')
-      .setDescription('Exclude yourself from gambling for a period.')
-      .addStringOption((opt) =>
-        opt
-          .setName('duration')
-          .setDescription('Exclusion duration')
-          .setRequired(true)
-          .addChoices(
-            { name: '7 days', value: '7d' },
-            { name: '30 days', value: '30d' },
-            { name: '90 days', value: '90d' },
-            { name: 'Permanent', value: 'permanent' }
-          )
-      )
-  )
-  .addSubcommand((sub) =>
-    sub.setName('status').setDescription('Check your current exclusion status.')
-  )
-  .addSubcommand((sub) =>
-    sub.setName('help').setDescription('View responsible gambling resources.')
-  );
-
-// Pending confirmations for permanent exclusion.
 const pendingPermanent = new Set();
 
-async function execute(interaction) {
-  const userId = interaction.user.id;
-  const sub = interaction.options.getSubcommand();
+async function execute(message, args) {
+  const userId = message.author.id;
+  const sub = (args[0] || 'help').toLowerCase();
 
   if (sub === 'help') {
     const embed = new EmbedBuilder()
@@ -53,47 +28,36 @@ async function execute(interaction) {
       .setDescription(HELPLINE_INFO)
       .setColor(0x3498db)
       .addFields(
-        { name: 'Self-Exclusion', value: 'Use `/exclude set` to temporarily or permanently block yourself from gambling.', inline: false },
-        { name: 'Remember', value: 'Gambling should be entertainment, not a way to make money. Only gamble what you can afford to lose.', inline: false }
+        { name: 'Self-Exclusion', value: 'Use `=exclude set <7d|30d|90d|permanent>` to block yourself from gambling.', inline: false },
+        { name: 'Remember', value: 'Only gamble what you can afford to lose.', inline: false }
       );
-
-    return interaction.reply({ embeds: [embed], ephemeral: true });
+    return message.reply({ embeds: [embed] });
   }
 
   if (sub === 'status') {
     const exclusion = db.prepare('SELECT * FROM self_exclusions WHERE user_id = ?').get(userId);
-
     if (!exclusion) {
-      return interaction.reply({ content: 'You are not currently self-excluded.', ephemeral: true });
+      return message.reply('You are not currently self-excluded.');
     }
-
     if (exclusion.permanent) {
-      return interaction.reply({
-        content: 'You are **permanently** self-excluded. Contact an admin to reverse this.',
-        ephemeral: true,
-      });
+      return message.reply('You are **permanently** self-excluded. Contact an admin to reverse this.');
     }
-
     const until = new Date(exclusion.excluded_until);
     if (until > new Date()) {
-      return interaction.reply({
-        content: `You are self-excluded until **${until.toISOString().split('T')[0]}**.`,
-        ephemeral: true,
-      });
+      return message.reply(`You are self-excluded until **${until.toISOString().split('T')[0]}**.`);
     }
-
-    // Expired.
     db.prepare('DELETE FROM self_exclusions WHERE user_id = ?').run(userId);
-    return interaction.reply({ content: 'Your self-exclusion has expired. You can play again.', ephemeral: true });
+    return message.reply('Your self-exclusion has expired. You can play again.');
   }
 
   if (sub === 'set') {
-    const duration = interaction.options.getString('duration');
+    const duration = (args[1] || '').toLowerCase();
+    if (!['7d', '30d', '90d', 'permanent'].includes(duration)) {
+      return message.reply('Usage: `=exclude set <7d|30d|90d|permanent>`');
+    }
 
     if (duration === 'permanent') {
-      // Require confirmation for permanent exclusion.
       pendingPermanent.add(userId);
-
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId(`exclude:confirm:${userId}`)
@@ -104,15 +68,12 @@ async function execute(interaction) {
           .setLabel('Cancel')
           .setStyle(ButtonStyle.Secondary)
       );
-
-      return interaction.reply({
+      return message.reply({
         content: '**WARNING:** Permanent self-exclusion **cannot be undone by you**. Only an admin can reverse it. Are you sure?',
         components: [row],
-        ephemeral: true,
       });
     }
 
-    // Calculate the exclusion end date.
     const days = parseInt(duration, 10);
     const until = new Date();
     until.setDate(until.getDate() + days);
@@ -124,12 +85,14 @@ async function execute(interaction) {
 
     const embed = new EmbedBuilder()
       .setTitle('Self-Exclusion Active')
-      .setDescription(`You are now excluded from gambling until **${until.toISOString().split('T')[0]}**.`)
+      .setDescription(`You are now excluded until **${until.toISOString().split('T')[0]}**.`)
       .setColor(0xe67e22)
       .addFields({ name: 'Need Help?', value: HELPLINE_INFO, inline: false });
 
-    return interaction.reply({ embeds: [embed], ephemeral: true });
+    return message.reply({ embeds: [embed] });
   }
+
+  return message.reply('Usage: `=exclude <set|status|help> [duration]`');
 }
 
 async function handleButton(interaction) {
@@ -148,7 +111,6 @@ async function handleButton(interaction) {
     if (!pendingPermanent.has(ownerId)) {
       return interaction.update({ content: 'This confirmation has expired.', components: [] });
     }
-
     pendingPermanent.delete(ownerId);
 
     db.prepare(
@@ -158,7 +120,7 @@ async function handleButton(interaction) {
 
     const embed = new EmbedBuilder()
       .setTitle('Permanent Self-Exclusion Active')
-      .setDescription('You have been permanently excluded from gambling. Contact an admin to reverse this.')
+      .setDescription('You have been permanently excluded. Contact an admin to reverse this.')
       .setColor(0xe74c3c)
       .addFields({ name: 'Need Help?', value: HELPLINE_INFO, inline: false });
 
@@ -166,4 +128,4 @@ async function handleButton(interaction) {
   }
 }
 
-module.exports = { data, execute, handleButton };
+module.exports = { name, aliases, description, execute, handleButton };

@@ -2,13 +2,13 @@ require('dotenv').config();
 
 const { Client, GatewayIntentBits, Events } = require('discord.js');
 const express = require('express');
-const { loadCommands } = require('./utils/commandHandler');
+const { loadCommands, resolveCommand, PREFIX } = require('./utils/commandHandler');
 const { startCronJobs } = require('./jobs/dailyBonus');
 const { runChecks } = require('./utils/rateLimit');
 const { initDepositListener } = require('./services/depositListener');
 
 // Validate required environment variables.
-const requiredEnvVars = ['DISCORD_TOKEN', 'CLIENT_ID'];
+const requiredEnvVars = ['DISCORD_TOKEN'];
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {
     console.error(`[FATAL] Missing required environment variable: ${envVar}`);
@@ -19,23 +19,23 @@ for (const envVar of requiredEnvVars) {
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers, // Required for VIP role assignment.
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
   ],
 });
 
 client.once(Events.ClientReady, async (readyClient) => {
   console.log(`[BOT] Logged in as ${readyClient.user.tag}`);
-  await loadCommands(client);
+  console.log(`[BOT] Prefix: ${PREFIX}`);
+  loadCommands(client);
   startCronJobs(client);
 
   // Start the Express server for webhook endpoints.
   const app = express();
   const port = process.env.WEBHOOK_PORT || 3000;
 
-  // Health check endpoint.
   app.get('/health', (_req, res) => res.json({ status: 'ok', bot: readyClient.user.tag }));
-
-  // Initialize deposit listener (webhook + provider modes).
   initDepositListener(client, app);
 
   app.listen(port, () => {
@@ -43,82 +43,56 @@ client.once(Events.ClientReady, async (readyClient) => {
   });
 });
 
-/**
- * Sends an error reply to an interaction, handling already-replied states.
- * @param {import('discord.js').Interaction} interaction
- * @param {string} message
- */
-async function safeErrorReply(interaction, message) {
-  const reply = { content: message, ephemeral: true };
-  if (interaction.replied || interaction.deferred) {
-    await interaction.followUp(reply);
-  } else {
-    await interaction.reply(reply);
+// --- Prefix Command Handler ---
+client.on(Events.MessageCreate, async (message) => {
+  // Ignore bots and messages without the prefix.
+  if (message.author.bot) return;
+  if (!message.content.startsWith(PREFIX)) return;
+
+  // Parse command name and arguments.
+  const content = message.content.slice(PREFIX.length).trim();
+  if (!content) return;
+
+  const args = content.split(/\s+/);
+  const commandName = args.shift().toLowerCase();
+
+  const command = resolveCommand(client, commandName);
+  if (!command) return;
+
+  // Run pre-command checks (ban, exclusion, rate limit).
+  const blocked = runChecks(message.author.id, command.name);
+  if (blocked) {
+    return message.reply(blocked);
   }
-}
 
-// Handle all interactions.
-client.on(Events.InteractionCreate, async (interaction) => {
-  // --- Slash Commands ---
-  if (interaction.isChatInputCommand()) {
-    const command = client.commands?.get(interaction.commandName);
-    if (!command) return;
-
-    // Run pre-command checks (ban, exclusion, rate limit).
-    const blocked = runChecks(interaction.user.id, interaction.commandName);
-    if (blocked) {
-      return interaction.reply({ content: blocked, ephemeral: true });
-    }
-
+  try {
+    await command.execute(message, args);
+  } catch (error) {
+    console.error(`[ERR] Command ${PREFIX}${commandName}:`, error);
     try {
-      await command.execute(interaction);
-    } catch (error) {
-      console.error(`[ERR] Command /${interaction.commandName}:`, error);
-      await safeErrorReply(interaction, 'An error occurred while running this command.');
+      await message.reply('An error occurred while running this command.');
+    } catch (_replyErr) {
+      // Message may have been deleted.
     }
-    return;
   }
+});
 
-  // --- Button Interactions ---
+// --- Button Interactions (still used by games like blackjack, coinflip, exclude) ---
+client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isButton()) {
     const [handler] = interaction.customId.split(':');
-    const command = client.commands?.get(handler);
+    const command = resolveCommand(client, handler);
     if (command && command.handleButton) {
       try {
         await command.handleButton(interaction);
       } catch (error) {
         console.error(`[ERR] Button ${interaction.customId}:`, error);
-        await safeErrorReply(interaction, 'An error occurred while processing this action.');
-      }
-    }
-    return;
-  }
-
-  // --- Select Menu Interactions ---
-  if (interaction.isStringSelectMenu()) {
-    const [handler] = interaction.customId.split(':');
-    const command = client.commands?.get(handler);
-    if (command && command.handleSelectMenu) {
-      try {
-        await command.handleSelectMenu(interaction);
-      } catch (error) {
-        console.error(`[ERR] SelectMenu ${interaction.customId}:`, error);
-        await safeErrorReply(interaction, 'An error occurred while processing this selection.');
-      }
-    }
-    return;
-  }
-
-  // --- Modal Interactions ---
-  if (interaction.isModalSubmit()) {
-    const [handler] = interaction.customId.split(':');
-    const command = client.commands?.get(handler);
-    if (command && command.handleModal) {
-      try {
-        await command.handleModal(interaction);
-      } catch (error) {
-        console.error(`[ERR] Modal ${interaction.customId}:`, error);
-        await safeErrorReply(interaction, 'An error occurred while processing this form.');
+        const reply = { content: 'An error occurred.', ephemeral: true };
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp(reply);
+        } else {
+          await interaction.reply(reply);
+        }
       }
     }
   }

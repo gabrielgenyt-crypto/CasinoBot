@@ -1,101 +1,59 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const db = require('../utils/database');
 const { updateBalance, getBalance, ensureWallet } = require('../utils/wallet');
 const { getEntries: getAuditEntries } = require('../utils/auditLog');
 
-const data = new SlashCommandBuilder()
-  .setName('admin')
-  .setDescription('Admin-only commands for managing the casino.')
-  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-  .addSubcommand((sub) =>
-    sub
-      .setName('ban')
-      .setDescription('Ban a user from the casino.')
-      .addUserOption((opt) => opt.setName('user').setDescription('User to ban').setRequired(true))
-      .addStringOption((opt) => opt.setName('reason').setDescription('Ban reason').setRequired(false))
-  )
-  .addSubcommand((sub) =>
-    sub
-      .setName('unban')
-      .setDescription('Unban a user from the casino.')
-      .addUserOption((opt) => opt.setName('user').setDescription('User to unban').setRequired(true))
-  )
-  .addSubcommand((sub) =>
-    sub
-      .setName('balance')
-      .setDescription('Adjust a user\'s balance.')
-      .addUserOption((opt) => opt.setName('user').setDescription('Target user').setRequired(true))
-      .addIntegerOption((opt) => opt.setName('amount').setDescription('Amount to add (negative to subtract)').setRequired(true))
-      .addStringOption((opt) => opt.setName('reason').setDescription('Reason for adjustment').setRequired(false))
-  )
-  .addSubcommand((sub) =>
-    sub
-      .setName('promo')
-      .setDescription('Create a promo code.')
-      .addStringOption((opt) => opt.setName('code').setDescription('The promo code').setRequired(true))
-      .addIntegerOption((opt) => opt.setName('amount').setDescription('Coin amount per claim').setRequired(true).setMinValue(1))
-      .addIntegerOption((opt) => opt.setName('max_uses').setDescription('Maximum number of uses (default 1)').setRequired(false).setMinValue(1))
-      .addStringOption((opt) => opt.setName('expires').setDescription('Expiry date (ISO format, e.g. 2026-12-31)').setRequired(false))
-  )
-  .addSubcommand((sub) =>
-    sub.setName('stats').setDescription('View global casino statistics.')
-  )
-  .addSubcommand((sub) =>
-    sub
-      .setName('approve')
-      .setDescription('Approve a pending withdrawal request.')
-      .addIntegerOption((opt) => opt.setName('id').setDescription('Withdrawal request ID').setRequired(true))
-  )
-  .addSubcommand((sub) =>
-    sub
-      .setName('audit')
-      .setDescription('View the audit log.')
-      .addUserOption((opt) => opt.setName('user').setDescription('Filter by user').setRequired(false))
-      .addStringOption((opt) => opt.setName('action').setDescription('Filter by action type').setRequired(false))
-      .addIntegerOption((opt) => opt.setName('limit').setDescription('Number of entries (default 15)').setRequired(false).setMinValue(1).setMaxValue(50))
-  );
+const name = 'admin';
+const aliases = [];
+const description = 'Admin commands. Usage: =admin <ban|unban|balance|promo|stats|approve|audit> [args]';
 
-async function execute(interaction) {
-  const sub = interaction.options.getSubcommand();
+async function execute(message, args) {
+  // Check admin permission.
+  if (!message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
+    return message.reply('Admin only.');
+  }
+
+  const sub = (args[0] || '').toLowerCase();
 
   if (sub === 'ban') {
-    const target = interaction.options.getUser('user');
-    const reason = interaction.options.getString('reason') || 'No reason provided';
+    const target = message.mentions.users.first();
+    if (!target) return message.reply('Usage: `=admin ban @user [reason]`');
+    const reason = args.slice(2).join(' ') || 'No reason provided';
 
     const existing = db.prepare('SELECT user_id FROM bans WHERE user_id = ?').get(target.id);
-    if (existing) {
-      return interaction.reply({ content: `${target.username} is already banned.`, ephemeral: true });
-    }
+    if (existing) return message.reply(`${target.username} is already banned.`);
 
     db.prepare('INSERT INTO bans (user_id, reason, banned_by) VALUES (?, ?, ?)')
-      .run(target.id, reason, interaction.user.id);
+      .run(target.id, reason, message.author.id);
 
     const embed = new EmbedBuilder()
       .setTitle('User Banned')
-      .setDescription(`**${target.username}** has been banned from the casino.`)
+      .setDescription(`**${target.username}** has been banned.`)
       .setColor(0xe74c3c)
       .addFields({ name: 'Reason', value: reason, inline: false })
       .setTimestamp();
 
-    return interaction.reply({ embeds: [embed] });
+    return message.reply({ embeds: [embed] });
   }
 
   if (sub === 'unban') {
-    const target = interaction.options.getUser('user');
+    const target = message.mentions.users.first();
+    if (!target) return message.reply('Usage: `=admin unban @user`');
+
     const result = db.prepare('DELETE FROM bans WHERE user_id = ?').run(target.id);
+    if (result.changes === 0) return message.reply(`${target.username} is not banned.`);
 
-    if (result.changes === 0) {
-      return interaction.reply({ content: `${target.username} is not banned.`, ephemeral: true });
-    }
-
-    return interaction.reply({ content: `**${target.username}** has been unbanned.` });
+    return message.reply(`**${target.username}** has been unbanned.`);
   }
 
-  if (sub === 'balance') {
-    const target = interaction.options.getUser('user');
-    const amount = interaction.options.getInteger('amount');
-    const reason = interaction.options.getString('reason') || 'admin adjustment';
+  if (sub === 'balance' || sub === 'bal') {
+    const target = message.mentions.users.first();
+    if (!target) return message.reply('Usage: `=admin balance @user <amount> [reason]`');
 
+    const amount = parseInt(args[2], 10);
+    if (isNaN(amount)) return message.reply('Amount must be a number.');
+
+    const reason = args.slice(3).join(' ') || 'admin adjustment';
     ensureWallet(target.id);
 
     try {
@@ -104,7 +62,7 @@ async function execute(interaction) {
 
       const embed = new EmbedBuilder()
         .setTitle('Balance Adjusted')
-        .setDescription(`**${target.username}**'s balance adjusted by **${sign}${amount}**`)
+        .setDescription(`**${target.username}** adjusted by **${sign}${amount}**`)
         .setColor(0xf1c40f)
         .addFields(
           { name: 'New Balance', value: `${newBalance}`, inline: true },
@@ -112,45 +70,42 @@ async function execute(interaction) {
         )
         .setTimestamp();
 
-      return interaction.reply({ embeds: [embed] });
+      return message.reply({ embeds: [embed] });
     } catch (error) {
       if (error.message === 'INSUFFICIENT_FUNDS') {
-        return interaction.reply({
-          content: `Cannot subtract ${Math.abs(amount)} — user only has ${getBalance(target.id)} coins.`,
-          ephemeral: true,
-        });
+        return message.reply(`Cannot subtract — user only has ${getBalance(target.id)} coins.`);
       }
       throw error;
     }
   }
 
   if (sub === 'promo') {
-    const code = interaction.options.getString('code').toUpperCase();
-    const amount = interaction.options.getInteger('amount');
-    const maxUses = interaction.options.getInteger('max_uses') || 1;
-    const expires = interaction.options.getString('expires') || null;
+    const code = (args[1] || '').toUpperCase();
+    const amount = parseInt(args[2], 10);
+    const maxUses = parseInt(args[3], 10) || 1;
 
-    const existing = db.prepare('SELECT code FROM promo_codes WHERE code = ?').get(code);
-    if (existing) {
-      return interaction.reply({ content: `Promo code **${code}** already exists.`, ephemeral: true });
+    if (!code || isNaN(amount) || amount < 1) {
+      return message.reply('Usage: `=admin promo <code> <amount> [max_uses]`');
     }
 
+    const existing = db.prepare('SELECT code FROM promo_codes WHERE code = ?').get(code);
+    if (existing) return message.reply(`Promo code **${code}** already exists.`);
+
     db.prepare(
-      'INSERT INTO promo_codes (code, amount, max_uses, expires_at, created_by) VALUES (?, ?, ?, ?, ?)'
-    ).run(code, amount, maxUses, expires, interaction.user.id);
+      'INSERT INTO promo_codes (code, amount, max_uses, created_by) VALUES (?, ?, ?, ?)'
+    ).run(code, amount, maxUses, message.author.id);
 
     const embed = new EmbedBuilder()
       .setTitle('Promo Code Created')
       .setColor(0x2ecc71)
       .addFields(
         { name: 'Code', value: `\`${code}\``, inline: true },
-        { name: 'Amount', value: `${amount} coins`, inline: true },
-        { name: 'Max Uses', value: `${maxUses}`, inline: true },
-        { name: 'Expires', value: expires || 'Never', inline: true }
+        { name: 'Amount', value: `${amount}`, inline: true },
+        { name: 'Max Uses', value: `${maxUses}`, inline: true }
       )
       .setTimestamp();
 
-    return interaction.reply({ embeds: [embed] });
+    return message.reply({ embeds: [embed] });
   }
 
   if (sub === 'stats') {
@@ -170,8 +125,8 @@ async function execute(interaction) {
       .setColor(0x3498db)
       .addFields(
         { name: 'Total Users', value: `${totalUsers}`, inline: true },
-        { name: 'Total Balance (all users)', value: `${totalBalance}`, inline: true },
-        { name: 'Total Games Played', value: `${totalGames}`, inline: true },
+        { name: 'Total Balance', value: `${totalBalance}`, inline: true },
+        { name: 'Total Games', value: `${totalGames}`, inline: true },
         { name: 'Total Wagered', value: `${totalWagered}`, inline: true },
         { name: 'Total Payouts', value: `${totalPayout}`, inline: true },
         { name: 'House Profit', value: `${houseProfit}`, inline: true },
@@ -179,71 +134,65 @@ async function execute(interaction) {
       )
       .setTimestamp();
 
-    return interaction.reply({ embeds: [embed], ephemeral: true });
+    return message.reply({ embeds: [embed] });
   }
 
   if (sub === 'approve') {
-    const requestId = interaction.options.getInteger('id');
+    const requestId = parseInt(args[1], 10);
+    if (isNaN(requestId)) return message.reply('Usage: `=admin approve <id>`');
 
     const request = db.prepare('SELECT * FROM withdraw_requests WHERE id = ? AND status = ?')
       .get(requestId, 'pending');
-
-    if (!request) {
-      return interaction.reply({ content: `No pending withdrawal request with ID ${requestId}.`, ephemeral: true });
-    }
+    if (!request) return message.reply(`No pending withdrawal #${requestId}.`);
 
     db.prepare('UPDATE withdraw_requests SET status = ?, reviewed_by = ?, updated_at = ? WHERE id = ?')
-      .run('approved', interaction.user.id, new Date().toISOString(), requestId);
+      .run('approved', message.author.id, new Date().toISOString(), requestId);
 
     const embed = new EmbedBuilder()
       .setTitle('Withdrawal Approved')
       .setColor(0x2ecc71)
       .addFields(
-        { name: 'Request ID', value: `${requestId}`, inline: true },
+        { name: 'ID', value: `${requestId}`, inline: true },
         { name: 'User', value: `<@${request.user_id}>`, inline: true },
         { name: 'Amount', value: `${request.amount}`, inline: true },
         { name: 'Chain', value: request.chain, inline: true },
         { name: 'Address', value: `\`${request.address}\``, inline: false }
       )
-      .setFooter({ text: 'Blockchain transaction must be sent manually or via automation.' })
       .setTimestamp();
 
-    return interaction.reply({ embeds: [embed] });
+    return message.reply({ embeds: [embed] });
   }
 
   if (sub === 'audit') {
-    const targetUser = interaction.options.getUser('user');
-    const action = interaction.options.getString('action');
-    const limit = interaction.options.getInteger('limit') || 15;
+    const target = message.mentions.users.first();
+    const action = args.find((a) => !a.startsWith('<@') && a !== 'audit');
+    const limit = parseInt(args[args.length - 1], 10) || 15;
 
     const entries = getAuditEntries({
-      userId: targetUser?.id,
-      action,
-      limit,
+      userId: target?.id,
+      action: action && !isNaN(parseInt(action, 10)) ? undefined : action,
+      limit: Math.min(limit, 50),
     });
 
-    if (entries.length === 0) {
-      return interaction.reply({ content: 'No audit log entries found.', ephemeral: true });
-    }
+    if (entries.length === 0) return message.reply('No audit log entries found.');
 
     const lines = entries.map((e) => {
-      const target = e.target_id ? ` -> <@${e.target_id}>` : '';
-      const details = e.details ? ` | ${e.details.substring(0, 60)}` : '';
-      return `\`${e.created_at}\` <@${e.user_id}>${target} **${e.action}**${details}`;
+      const tgt = e.target_id ? ` -> <@${e.target_id}>` : '';
+      const details = e.details ? ` | ${e.details.substring(0, 50)}` : '';
+      return `\`${e.created_at}\` <@${e.user_id}>${tgt} **${e.action}**${details}`;
     });
-
-    // Split into chunks if too long for one embed.
-    const description = lines.join('\n').substring(0, 4000);
 
     const embed = new EmbedBuilder()
       .setTitle('Audit Log')
-      .setDescription(description)
+      .setDescription(lines.join('\n').substring(0, 4000))
       .setColor(0x95a5a6)
       .setFooter({ text: `Showing ${entries.length} entries` })
       .setTimestamp();
 
-    return interaction.reply({ embeds: [embed], ephemeral: true });
+    return message.reply({ embeds: [embed] });
   }
+
+  return message.reply('Usage: `=admin <ban|unban|balance|promo|stats|approve|audit> [args]`');
 }
 
-module.exports = { data, execute };
+module.exports = { name, aliases, description, execute };

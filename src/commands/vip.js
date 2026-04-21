@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 const { ensureWallet, updateBalance } = require('../utils/wallet');
 const {
   VIP_LEVELS,
@@ -7,23 +7,14 @@ const {
   claimCashback,
 } = require('../utils/vip');
 
-const data = new SlashCommandBuilder()
-  .setName('vip')
-  .setDescription('View your VIP status or claim cashback.')
-  .addSubcommand((sub) =>
-    sub.setName('status').setDescription('View your current VIP level and progress.')
-  )
-  .addSubcommand((sub) =>
-    sub.setName('cashback').setDescription('Claim your VIP cashback on losses.')
-  )
-  .addSubcommand((sub) =>
-    sub.setName('levels').setDescription('View all VIP levels and their benefits.')
-  );
+const name = 'vip';
+const aliases = [];
+const description = 'VIP system. Usage: =vip <status|cashback|levels>';
 
-async function execute(interaction) {
-  const userId = interaction.user.id;
+async function execute(message, args) {
+  const userId = message.author.id;
   ensureWallet(userId);
-  const sub = interaction.options.getSubcommand();
+  const sub = (args[0] || 'status').toLowerCase();
 
   if (sub === 'status') {
     const record = getVipRecord(userId);
@@ -31,7 +22,7 @@ async function execute(interaction) {
     const nextLevel = VIP_LEVELS[currentLevel.level + 1];
 
     const embed = new EmbedBuilder()
-      .setTitle(`VIP Status — ${interaction.user.username}`)
+      .setTitle(`VIP Status — ${message.author.username}`)
       .setColor(currentLevel.level >= 4 ? 0xe91e63 : currentLevel.level >= 2 ? 0xf1c40f : 0x95a5a6)
       .addFields(
         { name: 'Level', value: `**${currentLevel.name}** (Tier ${currentLevel.level})`, inline: true },
@@ -51,17 +42,13 @@ async function execute(interaction) {
       embed.addFields({ name: 'Status', value: 'Maximum VIP level reached!', inline: false });
     }
 
-    return interaction.reply({ embeds: [embed] });
+    return message.reply({ embeds: [embed] });
   }
 
   if (sub === 'cashback') {
     const result = claimCashback(userId);
-
     if (!result) {
-      return interaction.reply({
-        content: 'No cashback available. You need VIP status and net losses since your last claim.',
-        ephemeral: true,
-      });
+      return message.reply('No cashback available. You need VIP status and net losses since your last claim.');
     }
 
     const newBalance = updateBalance(userId, result.amount, 'vip cashback');
@@ -73,7 +60,7 @@ async function execute(interaction) {
       .addFields({ name: 'New Balance', value: `${newBalance}`, inline: true })
       .setTimestamp();
 
-    return interaction.reply({ embeds: [embed] });
+    return message.reply({ embeds: [embed] });
   }
 
   if (sub === 'levels') {
@@ -87,8 +74,10 @@ async function execute(interaction) {
       .setColor(0xe91e63)
       .setFooter({ text: 'Level up automatically by wagering more!' });
 
-    return interaction.reply({ embeds: [embed] });
+    return message.reply({ embeds: [embed] });
   }
+
+  return message.reply('Usage: `=vip <status|cashback|levels>`');
 }
 
-module.exports = { data, execute };
+module.exports = { name, aliases, description, execute };
