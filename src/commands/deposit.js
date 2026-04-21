@@ -1,8 +1,22 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const db = require('../utils/database');
 const { ensureWallet } = require('../utils/wallet');
+const { getOrCreateDepositAddress } = require('../utils/hdWallet');
 
 const SUPPORTED_CHAINS = ['ETH', 'BSC', 'SOL', 'MATIC'];
+
+const TOKEN_INFO = {
+  ETH: 'ETH, USDT, USDC',
+  BSC: 'BNB, USDT, USDC',
+  SOL: 'SOL, USDC',
+  MATIC: 'MATIC, USDT, USDC',
+};
+
+const CONFIRMATIONS = {
+  ETH: 12,
+  BSC: 15,
+  SOL: 32,
+  MATIC: 128,
+};
 
 const data = new SlashCommandBuilder()
   .setName('deposit')
@@ -23,36 +37,32 @@ async function execute(interaction) {
 
   const chain = interaction.options.getString('chain');
 
-  // Check if the user already has an address for this chain.
-  let record = db.prepare(
-    'SELECT address FROM deposit_addresses WHERE user_id = ? AND chain = ?'
-  ).get(userId, chain);
-
-  if (!record) {
-    // In production, this would derive an HD wallet address (BIP32/BIP39).
-    // For now, generate a placeholder address to demonstrate the flow.
-    const placeholder = `0x${require('crypto').randomBytes(20).toString('hex')}`;
-
-    db.prepare(
-      'INSERT INTO deposit_addresses (user_id, chain, address) VALUES (?, ?, ?)'
-    ).run(userId, chain, placeholder);
-
-    record = { address: placeholder };
+  let result;
+  try {
+    result = getOrCreateDepositAddress(userId, chain);
+  } catch (error) {
+    if (error.message.includes('WALLET_MNEMONIC')) {
+      return interaction.reply({
+        content: 'Deposit system is not configured yet. Contact an admin.',
+        ephemeral: true,
+      });
+    }
+    throw error;
   }
 
   const embed = new EmbedBuilder()
     .setTitle(`Deposit — ${chain}`)
     .setDescription(
-      `Send **${chain}** tokens to the address below.\n` +
-      'Your balance will be credited automatically after confirmations.\n\n' +
-      `**\`${record.address}\`**`
+      `Send **${chain}** tokens to your unique address below.\n` +
+      `Balance credited after **${CONFIRMATIONS[chain]}** confirmations.\n\n` +
+      `**\`${result.address}\`**`
     )
-    .setColor(0x3498db)
+    .setColor(result.isNew ? 0x2ecc71 : 0x3498db)
     .addFields(
-      { name: 'Supported Tokens', value: chain === 'ETH' ? 'ETH, USDT, USDC' : chain === 'BSC' ? 'BNB, USDT, USDC' : chain === 'SOL' ? 'SOL, USDC' : 'MATIC, USDT, USDC', inline: false },
-      { name: 'Note', value: 'Blockchain listener integration required for automatic crediting. Contact admin for manual deposits.', inline: false }
+      { name: 'Supported Tokens', value: TOKEN_INFO[chain], inline: true },
+      { name: 'Confirmations', value: `${CONFIRMATIONS[chain]}`, inline: true }
     )
-    .setFooter({ text: 'Only send supported tokens to this address.' });
+    .setFooter({ text: 'Only send supported tokens to this address. Other tokens may be lost.' });
 
   return interaction.reply({ embeds: [embed], ephemeral: true });
 }
