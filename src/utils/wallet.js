@@ -50,4 +50,20 @@ const ensureWallet = (userId) => {
   ).run(userId);
 };
 
-module.exports = { getBalance, updateBalance, ensureWallet };
+/**
+ * Records a completed game round in the history table.
+ *
+ * @param {string} userId - The Discord user ID.
+ * @param {string} game - The game identifier (e.g. 'coinflip', 'dice').
+ * @param {number} bet - The wager amount.
+ * @param {number} payout - The amount returned to the user (0 on loss).
+ * @param {boolean} won - Whether the user won.
+ * @param {string} [details] - Optional JSON string with game-specific details.
+ */
+const recordGame = (userId, game, bet, payout, won, details) => {
+  db.prepare(
+    'INSERT INTO game_history (user_id, game, bet, payout, won, details) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(userId, game, bet, payout, won ? 1 : 0, details || null);
+};
+
+module.exports = { getBalance, updateBalance, ensureWallet, recordGame };
