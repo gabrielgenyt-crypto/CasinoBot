@@ -1,9 +1,11 @@
 require('dotenv').config();
 
 const { Client, GatewayIntentBits, Events } = require('discord.js');
+const express = require('express');
 const { loadCommands } = require('./utils/commandHandler');
 const { startCronJobs } = require('./jobs/dailyBonus');
 const { runChecks } = require('./utils/rateLimit');
+const { initDepositListener } = require('./services/depositListener');
 
 // Validate required environment variables.
 const requiredEnvVars = ['DISCORD_TOKEN', 'CLIENT_ID'];
@@ -25,6 +27,20 @@ client.once(Events.ClientReady, async (readyClient) => {
   console.log(`[BOT] Logged in as ${readyClient.user.tag}`);
   await loadCommands(client);
   startCronJobs(client);
+
+  // Start the Express server for webhook endpoints.
+  const app = express();
+  const port = process.env.WEBHOOK_PORT || 3000;
+
+  // Health check endpoint.
+  app.get('/health', (_req, res) => res.json({ status: 'ok', bot: readyClient.user.tag }));
+
+  // Initialize deposit listener (webhook + provider modes).
+  initDepositListener(client, app);
+
+  app.listen(port, () => {
+    console.log(`[HTTP] Webhook server listening on port ${port}`);
+  });
 });
 
 /**

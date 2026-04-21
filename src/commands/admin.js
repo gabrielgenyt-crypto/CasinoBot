@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const db = require('../utils/database');
 const { updateBalance, getBalance, ensureWallet } = require('../utils/wallet');
+const { getEntries: getAuditEntries } = require('../utils/auditLog');
 
 const data = new SlashCommandBuilder()
   .setName('admin')
@@ -44,6 +45,14 @@ const data = new SlashCommandBuilder()
       .setName('approve')
       .setDescription('Approve a pending withdrawal request.')
       .addIntegerOption((opt) => opt.setName('id').setDescription('Withdrawal request ID').setRequired(true))
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName('audit')
+      .setDescription('View the audit log.')
+      .addUserOption((opt) => opt.setName('user').setDescription('Filter by user').setRequired(false))
+      .addStringOption((opt) => opt.setName('action').setDescription('Filter by action type').setRequired(false))
+      .addIntegerOption((opt) => opt.setName('limit').setDescription('Number of entries (default 15)').setRequired(false).setMinValue(1).setMaxValue(50))
   );
 
 async function execute(interaction) {
@@ -200,6 +209,40 @@ async function execute(interaction) {
       .setTimestamp();
 
     return interaction.reply({ embeds: [embed] });
+  }
+
+  if (sub === 'audit') {
+    const targetUser = interaction.options.getUser('user');
+    const action = interaction.options.getString('action');
+    const limit = interaction.options.getInteger('limit') || 15;
+
+    const entries = getAuditEntries({
+      userId: targetUser?.id,
+      action,
+      limit,
+    });
+
+    if (entries.length === 0) {
+      return interaction.reply({ content: 'No audit log entries found.', ephemeral: true });
+    }
+
+    const lines = entries.map((e) => {
+      const target = e.target_id ? ` -> <@${e.target_id}>` : '';
+      const details = e.details ? ` | ${e.details.substring(0, 60)}` : '';
+      return `\`${e.created_at}\` <@${e.user_id}>${target} **${e.action}**${details}`;
+    });
+
+    // Split into chunks if too long for one embed.
+    const description = lines.join('\n').substring(0, 4000);
+
+    const embed = new EmbedBuilder()
+      .setTitle('Audit Log')
+      .setDescription(description)
+      .setColor(0x95a5a6)
+      .setFooter({ text: `Showing ${entries.length} entries` })
+      .setTimestamp();
+
+    return interaction.reply({ embeds: [embed], ephemeral: true });
   }
 }
 

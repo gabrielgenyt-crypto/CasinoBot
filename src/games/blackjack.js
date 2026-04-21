@@ -1,5 +1,6 @@
 const { getNextResult } = require('../utils/provablyFair');
 const { updateBalance, getBalance, recordGame } = require('../utils/wallet');
+const { addWagered } = require('../utils/vip');
 
 const SUITS = ['♠', '♥', '♦', '♣'];
 const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -166,6 +167,7 @@ const resolveGame = (state) => {
       playerValue: playerVal,
       dealerValue: handValue(state.dealerHand),
     }));
+    state.vipLevelUp = addWagered(state.userId, state.bet).newLevel;
     return state;
   }
 
@@ -218,6 +220,8 @@ const resolveGame = (state) => {
     dealerValue: dealerVal,
     outcome: state.outcome,
   }));
+
+  state.vipLevelUp = addWagered(state.userId, state.bet).newLevel;
 
   return state;
 };

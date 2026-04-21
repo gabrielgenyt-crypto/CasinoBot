@@ -1,5 +1,6 @@
 const { getNextResult } = require('../utils/provablyFair');
 const { updateBalance, getBalance, recordGame } = require('../utils/wallet');
+const { addWagered } = require('../utils/vip');
 
 // European roulette: numbers 0-36. House edge 2.7% (single zero).
 const RED_NUMBERS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
@@ -86,7 +87,9 @@ const playRoulette = (userId, bet, betType) => {
     number, color, betType, betLabel,
   }));
 
-  return { won, number, color, betLabel, payout, newBalance, nonce, serverSeedHash };
+  const vipResult = addWagered(userId, bet);
+
+  return { won, number, color, betLabel, payout, newBalance, nonce, serverSeedHash, vipLevelUp: vipResult.newLevel };
 };
 
 module.exports = { playRoulette, BET_TYPES, getColor };

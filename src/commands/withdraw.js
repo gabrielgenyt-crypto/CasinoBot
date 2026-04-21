@@ -1,6 +1,8 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const db = require('../utils/database');
 const { getBalance, updateBalance, ensureWallet } = require('../utils/wallet');
+const { validateAddress, isBlockedAddress } = require('../utils/addressValidator');
+const { log, ACTIONS } = require('../utils/auditLog');
 
 const SUPPORTED_CHAINS = ['ETH', 'BSC', 'SOL', 'MATIC'];
 const DAILY_LIMIT = 50000;
@@ -31,8 +33,25 @@ async function execute(interaction) {
 
   const amount = interaction.options.getInteger('amount');
   const chain = interaction.options.getString('chain');
-  const address = interaction.options.getString('address');
+  const rawAddress = interaction.options.getString('address');
   const balance = getBalance(userId);
+
+  // Validate the destination address.
+  const validation = validateAddress(chain, rawAddress);
+  if (!validation.valid) {
+    return interaction.reply({
+      content: `Invalid ${chain} address: ${validation.error}`,
+      ephemeral: true,
+    });
+  }
+  const address = validation.address;
+
+  if (isBlockedAddress(address)) {
+    return interaction.reply({
+      content: 'This address is blocked. Contact support if you believe this is an error.',
+      ephemeral: true,
+    });
+  }
 
   if (amount > balance) {
     return interaction.reply({
@@ -90,6 +109,10 @@ async function execute(interaction) {
   const result = db.prepare(
     'INSERT INTO withdraw_requests (user_id, chain, address, amount, status) VALUES (?, ?, ?, ?, ?)'
   ).run(userId, chain, address, amount, status);
+
+  log(userId, ACTIONS.WITHDRAW_REQUEST, {
+    details: JSON.stringify({ id: result.lastInsertRowid, chain, address, amount, needsApproval }),
+  });
 
   const embed = new EmbedBuilder()
     .setTitle('Withdrawal Request Created')
