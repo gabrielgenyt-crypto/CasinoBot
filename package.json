@@ -1,0 +1,30 @@
+{
+  "name": "cryptovault-casino-bot",
+  "version": "1.0.0",
+  "description": "CryptoVault Casino Bot - A Discord casino bot with provably fair games and atomic wallet transactions",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix"
+  },
+  "keywords": [
+    "discord",
+    "casino",
+    "bot",
+    "provably-fair"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.7",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
