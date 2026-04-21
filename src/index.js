@@ -3,6 +3,7 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, Events } = require('discord.js');
 const { loadCommands } = require('./utils/commandHandler');
 const { startCronJobs } = require('./jobs/dailyBonus');
+const { runChecks } = require('./utils/rateLimit');
 
 // Validate required environment variables.
 const requiredEnvVars = ['DISCORD_TOKEN', 'CLIENT_ID'];
@@ -14,7 +15,10 @@ for (const envVar of requiredEnvVars) {
 }
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers, // Required for VIP role assignment.
+  ],
 });
 
 client.once(Events.ClientReady, async (readyClient) => {
@@ -23,30 +27,43 @@ client.once(Events.ClientReady, async (readyClient) => {
   startCronJobs(client);
 });
 
-// Handle slash command interactions.
+/**
+ * Sends an error reply to an interaction, handling already-replied states.
+ * @param {import('discord.js').Interaction} interaction
+ * @param {string} message
+ */
+async function safeErrorReply(interaction, message) {
+  const reply = { content: message, ephemeral: true };
+  if (interaction.replied || interaction.deferred) {
+    await interaction.followUp(reply);
+  } else {
+    await interaction.reply(reply);
+  }
+}
+
+// Handle all interactions.
 client.on(Events.InteractionCreate, async (interaction) => {
+  // --- Slash Commands ---
   if (interaction.isChatInputCommand()) {
     const command = client.commands?.get(interaction.commandName);
     if (!command) return;
+
+    // Run pre-command checks (ban, exclusion, rate limit).
+    const blocked = runChecks(interaction.user.id, interaction.commandName);
+    if (blocked) {
+      return interaction.reply({ content: blocked, ephemeral: true });
+    }
 
     try {
       await command.execute(interaction);
     } catch (error) {
       console.error(`[ERR] Command /${interaction.commandName}:`, error);
-      const reply = {
-        content: 'An error occurred while running this command.',
-        ephemeral: true,
-      };
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp(reply);
-      } else {
-        await interaction.reply(reply);
-      }
+      await safeErrorReply(interaction, 'An error occurred while running this command.');
     }
     return;
   }
 
-  // Handle button interactions (used by games).
+  // --- Button Interactions ---
   if (interaction.isButton()) {
     const [handler] = interaction.customId.split(':');
     const command = client.commands?.get(handler);
@@ -55,15 +72,37 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await command.handleButton(interaction);
       } catch (error) {
         console.error(`[ERR] Button ${interaction.customId}:`, error);
-        const reply = {
-          content: 'An error occurred while processing this action.',
-          ephemeral: true,
-        };
-        if (interaction.replied || interaction.deferred) {
-          await interaction.followUp(reply);
-        } else {
-          await interaction.reply(reply);
-        }
+        await safeErrorReply(interaction, 'An error occurred while processing this action.');
+      }
+    }
+    return;
+  }
+
+  // --- Select Menu Interactions ---
+  if (interaction.isStringSelectMenu()) {
+    const [handler] = interaction.customId.split(':');
+    const command = client.commands?.get(handler);
+    if (command && command.handleSelectMenu) {
+      try {
+        await command.handleSelectMenu(interaction);
+      } catch (error) {
+        console.error(`[ERR] SelectMenu ${interaction.customId}:`, error);
+        await safeErrorReply(interaction, 'An error occurred while processing this selection.');
+      }
+    }
+    return;
+  }
+
+  // --- Modal Interactions ---
+  if (interaction.isModalSubmit()) {
+    const [handler] = interaction.customId.split(':');
+    const command = client.commands?.get(handler);
+    if (command && command.handleModal) {
+      try {
+        await command.handleModal(interaction);
+      } catch (error) {
+        console.error(`[ERR] Modal ${interaction.customId}:`, error);
+        await safeErrorReply(interaction, 'An error occurred while processing this form.');
       }
     }
   }
