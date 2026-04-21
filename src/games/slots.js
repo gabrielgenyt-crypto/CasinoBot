@@ -1,5 +1,6 @@
 const { getNextResult } = require('../utils/provablyFair');
 const { updateBalance, getBalance, recordGame } = require('../utils/wallet');
+const { addWagered } = require('../utils/vip');
 
 // Slot symbols ordered by rarity (rarest first).
 // Each symbol has a weight that determines how often it appears on a reel.
@@ -98,6 +99,8 @@ const playSlots = (userId, bet) => {
     reels: reels.map((r) => r.name), multiplier,
   }));
 
+  const vipResult = addWagered(userId, bet);
+
   return {
     reels,
     won,
@@ -106,6 +109,7 @@ const playSlots = (userId, bet) => {
     newBalance,
     nonce: r1.nonce,
     serverSeedHash: r1.serverSeedHash,
+    vipLevelUp: vipResult.newLevel,
   };
 };
 

@@ -1,5 +1,6 @@
 const { getNextResult } = require('../utils/provablyFair');
 const { updateBalance, recordGame } = require('../utils/wallet');
+const { addWagered } = require('../utils/vip');
 
 // House edge: 1%. Payout multiplier is calculated as (100 - houseEdge) / winChance.
 const HOUSE_EDGE = 0.01;
@@ -60,7 +61,9 @@ const playDice = (userId, bet, direction, target) => {
     roll, target, direction, multiplier,
   }));
 
-  return { won, roll, multiplier, payout, newBalance, nonce, serverSeedHash };
+  const vipResult = addWagered(userId, bet);
+
+  return { won, roll, multiplier, payout, newBalance, nonce, serverSeedHash, vipLevelUp: vipResult.newLevel };
 };
 
 module.exports = { playDice, getMultiplier };

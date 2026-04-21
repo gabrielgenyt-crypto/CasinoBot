@@ -143,6 +143,39 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_referrals_code ON referrals (referral_code);
   CREATE INDEX IF NOT EXISTS idx_withdraw_requests_status ON withdraw_requests (status);
+
+  CREATE TABLE IF NOT EXISTS tournaments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    game TEXT,
+    entry_fee INTEGER NOT NULL DEFAULT 0,
+    prize_pool INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'upcoming',
+    max_players INTEGER NOT NULL DEFAULT 100,
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS tournament_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tournament_id INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    score INTEGER NOT NULL DEFAULT 0,
+    games_played INTEGER NOT NULL DEFAULT 0,
+    joined_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(tournament_id, user_id),
+    FOREIGN KEY (tournament_id) REFERENCES tournaments(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS session_tracking (
+    user_id TEXT PRIMARY KEY,
+    session_start TEXT NOT NULL,
+    total_wagered_session INTEGER NOT NULL DEFAULT 0,
+    total_lost_session INTEGER NOT NULL DEFAULT 0,
+    last_warning TEXT
+  );
 `);
 
 module.exports = db;
