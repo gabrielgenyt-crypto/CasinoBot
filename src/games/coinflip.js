@@ -1,5 +1,5 @@
 const { getNextResult } = require('../utils/provablyFair');
-const { updateBalance } = require('../utils/wallet');
+const { updateBalance, getBalance, recordGame } = require('../utils/wallet');
 
 /**
  * Runs a coinflip game for the given user.
@@ -26,9 +26,12 @@ const playCoinflip = (userId, bet, choice) => {
     newBalance = updateBalance(userId, payout, 'coinflip win');
   } else {
     // Bet was already deducted; nothing more to do.
-    const { getBalance } = require('../utils/wallet');
     newBalance = getBalance(userId);
   }
+
+  recordGame(userId, 'coinflip', bet, payout, won, JSON.stringify({
+    side, choice,
+  }));
 
   return { won, side, payout, newBalance, nonce, serverSeedHash };
 };

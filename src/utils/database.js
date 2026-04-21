@@ -36,6 +36,21 @@ db.exec(`
     user_id TEXT PRIMARY KEY,
     last_claim TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS game_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    game TEXT NOT NULL,
+    bet INTEGER NOT NULL,
+    payout INTEGER NOT NULL DEFAULT 0,
+    won INTEGER NOT NULL DEFAULT 0,
+    details TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_game_history_user ON game_history (user_id);
+  CREATE INDEX IF NOT EXISTS idx_game_history_game ON game_history (game);
+  CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions (user_id);
 `);
 
 module.exports = db;
