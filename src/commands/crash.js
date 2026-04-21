@@ -1,35 +1,32 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 const { getBalance, ensureWallet } = require('../utils/wallet');
 const { playCrash } = require('../games/crash');
 
-const data = new SlashCommandBuilder()
-  .setName('crash')
-  .setDescription('Ride the multiplier! Cash out before it crashes.')
-  .addIntegerOption((opt) =>
-    opt.setName('bet').setDescription('Amount to wager').setRequired(true).setMinValue(1)
-  )
-  .addNumberOption((opt) =>
-    opt
-      .setName('cashout')
-      .setDescription('Auto-cashout multiplier (e.g. 2.0)')
-      .setRequired(true)
-      .setMinValue(1.01)
-      .setMaxValue(1000)
-  );
+const name = 'crash';
+const aliases = [];
+const description = 'Ride the multiplier! Usage: =crash <bet> <cashout>';
 
-async function execute(interaction) {
-  const userId = interaction.user.id;
+async function execute(message, args) {
+  const userId = message.author.id;
   ensureWallet(userId);
 
-  const bet = interaction.options.getInteger('bet');
-  const cashout = interaction.options.getNumber('cashout');
-  const balance = getBalance(userId);
+  if (args.length < 2) {
+    return message.reply('Usage: `=crash <bet> <cashout>`\nExample: `=crash 100 2.5`');
+  }
 
+  const bet = parseInt(args[0], 10);
+  const cashout = parseFloat(args[1]);
+
+  if (isNaN(bet) || bet < 1) {
+    return message.reply('Bet must be a positive number.');
+  }
+  if (isNaN(cashout) || cashout < 1.01 || cashout > 1000) {
+    return message.reply('Cashout must be between 1.01 and 1000.');
+  }
+
+  const balance = getBalance(userId);
   if (bet > balance) {
-    return interaction.reply({
-      content: `Insufficient funds. Your balance: **${balance}**`,
-      ephemeral: true,
-    });
+    return message.reply(`Insufficient funds. Your balance: **${balance}**`);
   }
 
   let result;
@@ -37,7 +34,7 @@ async function execute(interaction) {
     result = playCrash(userId, bet, cashout);
   } catch (error) {
     if (error.message === 'INSUFFICIENT_FUNDS') {
-      return interaction.reply({ content: 'Insufficient funds.', ephemeral: true });
+      return message.reply('Insufficient funds.');
     }
     throw error;
   }
@@ -51,19 +48,18 @@ async function execute(interaction) {
   const embed = new EmbedBuilder()
     .setTitle(`${crashEmoji} Crash - ${result.crashPoint}x`)
     .setDescription(
-      `**${interaction.user.username}** bet **${bet}** coins\n` +
+      `**${message.author.username}** bet **${bet}** coins\n` +
       `Target: **${result.cashout}x** | Crashed at: **${result.crashPoint}x**\n\n` +
       outcomeText
     )
     .setColor(color)
     .addFields(
       { name: 'Balance', value: `${result.newBalance}`, inline: true },
-      { name: 'Nonce', value: `${result.nonce}`, inline: true },
-      { name: 'Seed Hash', value: `\`${result.serverSeedHash.substring(0, 16)}...\``, inline: true }
+      { name: 'Nonce', value: `${result.nonce}`, inline: true }
     )
-    .setFooter({ text: 'Provably Fair | /fairness to verify' });
+    .setFooter({ text: 'Provably Fair | =fairness to verify' });
 
-  return interaction.reply({ embeds: [embed] });
+  return message.reply({ embeds: [embed] });
 }
 
-module.exports = { data, execute };
+module.exports = { name, aliases, description, execute };

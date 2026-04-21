@@ -1,24 +1,24 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 const { getBalance, ensureWallet } = require('../utils/wallet');
 
-const data = new SlashCommandBuilder()
-  .setName('balance')
-  .setDescription('Check your current coin balance.');
+const name = 'balance';
+const aliases = ['bal', 'wallet'];
+const description = 'Check your coin balance. Usage: =balance';
 
-async function execute(interaction) {
-  const userId = interaction.user.id;
+async function execute(message) {
+  const userId = message.author.id;
   ensureWallet(userId);
 
   const balance = getBalance(userId);
 
   const embed = new EmbedBuilder()
     .setTitle('Wallet')
-    .setDescription(`**${interaction.user.username}**'s balance`)
+    .setDescription(`**${message.author.username}**'s balance`)
     .setColor(0x3498db)
     .addFields({ name: 'Coins', value: `${balance}`, inline: true })
     .setTimestamp();
 
-  return interaction.reply({ embeds: [embed] });
+  return message.reply({ embeds: [embed] });
 }
 
-module.exports = { data, execute };
+module.exports = { name, aliases, description, execute };
