@@ -10,6 +10,7 @@ const {
   lossBanner,
   sleep,
 } = require('../utils/animations');
+const EMOJIS = require('../utils/emojis');
 
 // Build choices from BET_TYPES plus a few number examples.
 const betChoices = [
@@ -93,7 +94,7 @@ async function execute(interaction) {
 
   // ── Frame 1: Wheel starting to spin ──
   const frame1 = new EmbedBuilder()
-    .setTitle('🎡  R O U L E T T E  🎡')
+    .setTitle(`${EMOJIS.roulette}  R O U L E T T E  ${EMOJIS.roulette}`)
     .setDescription(
       `${DIVIDER}\n\n` +
       `${rouletteWheel(0)}\n\n` +
@@ -108,7 +109,7 @@ async function execute(interaction) {
   // ── Frame 2: Wheel spinning faster ──
   await sleep(600);
   const frame2 = new EmbedBuilder()
-    .setTitle('🎡  R O U L E T T E  🎡')
+    .setTitle(`${EMOJIS.roulette}  R O U L E T T E  ${EMOJIS.roulette}`)
     .setDescription(
       `${DIVIDER}\n\n` +
       `${rouletteWheel(1)}\n\n` +
@@ -122,7 +123,7 @@ async function execute(interaction) {
   // ── Frame 3: Ball bouncing ──
   await sleep(600);
   const frame3 = new EmbedBuilder()
-    .setTitle('🎡  R O U L E T T E  🎡')
+    .setTitle(`${EMOJIS.roulette}  R O U L E T T E  ${EMOJIS.roulette}`)
     .setDescription(
       `${DIVIDER}\n\n` +
       `${rouletteWheel(2)}\n\n` +
@@ -136,7 +137,7 @@ async function execute(interaction) {
   // ── Frame 4: Slowing down ──
   await sleep(700);
   const frame4 = new EmbedBuilder()
-    .setTitle('🎡  R O U L E T T E  🎡')
+    .setTitle(`${EMOJIS.roulette}  R O U L E T T E  ${EMOJIS.roulette}`)
     .setDescription(
       `${DIVIDER}\n\n` +
       `${rouletteWheel(3)}\n\n` +
@@ -160,8 +161,8 @@ async function execute(interaction) {
   const finalEmbed = new EmbedBuilder()
     .setTitle(
       isBigWin
-        ? `🎡💰  ${colorEmoji[result.color]} ${result.number}  💰🎡`
-        : `🎡  ${colorEmoji[result.color]} ${result.number}  🎡`
+        ? `${EMOJIS.roulette}${EMOJIS.coin}  ${colorEmoji[result.color]} ${result.number}  ${EMOJIS.coin}${EMOJIS.roulette}`
+        : `${EMOJIS.roulette}  ${colorEmoji[result.color]} ${result.number}  ${EMOJIS.roulette}`
     )
     .setDescription(
       (isBigWin ? `${SPARKLE_LINE}\n` : '') +
@@ -175,11 +176,11 @@ async function execute(interaction) {
     )
     .setColor(color)
     .addFields(
-      { name: '💰 Balance', value: `\`${result.newBalance.toLocaleString()}\``, inline: true },
+      { name: `${EMOJIS.coin} Balance`, value: `\`${result.newBalance.toLocaleString()}\``, inline: true },
       { name: '🔢 Nonce', value: `\`${result.nonce}\``, inline: true },
-      { name: '🔐 Seed', value: `\`${result.serverSeedHash.substring(0, 12)}...\``, inline: true }
+      { name: `${EMOJIS.shield} Seed`, value: `\`${result.serverSeedHash.substring(0, 12)}...\``, inline: true }
     )
-    .setFooter({ text: '🔒 Provably Fair | /fairness to verify' })
+    .setFooter({ text: `${EMOJIS.shield} Provably Fair | /fairness to verify` })
     .setTimestamp();
 
   if (result.vipLevelUp) {

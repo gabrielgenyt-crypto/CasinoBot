@@ -1,11 +1,12 @@
 const { getNextResult } = require('../utils/provablyFair');
 const { updateBalance, getBalance, recordGame } = require('../utils/wallet');
 const { addWagered } = require('../utils/vip');
+const EMOJIS = require('../utils/emojis');
 
 // Slot symbols ordered by rarity (rarest first).
 // Each symbol has a weight that determines how often it appears on a reel.
 const SYMBOLS = [
-  { emoji: '💎', name: 'diamond', weight: 2 },
+  { emoji: EMOJIS.diamond, name: 'diamond', weight: 2 },
   { emoji: '7️⃣', name: 'seven', weight: 5 },
   { emoji: '🔔', name: 'bell', weight: 8 },
   { emoji: '🍒', name: 'cherry', weight: 12 },

@@ -15,6 +15,7 @@ const {
   lossBanner,
   sleep,
 } = require('../utils/animations');
+const EMOJIS = require('../utils/emojis');
 
 // Temporary store for pending bets (userId -> bet amount).
 // Cleared once the user picks heads or tails.
@@ -73,12 +74,12 @@ async function execute(interaction) {
       .setCustomId(`coinflip:heads:${userId}`)
       .setLabel('HEADS')
       .setStyle(ButtonStyle.Primary)
-      .setEmoji('👑'),
+      .setEmoji('1496966950914490598'),
     new ButtonBuilder()
       .setCustomId(`coinflip:tails:${userId}`)
       .setLabel('TAILS')
       .setStyle(ButtonStyle.Secondary)
-      .setEmoji('🦅')
+      .setEmoji('1496966376169148617')
   );
 
   return interaction.reply({ embeds: [embed], components: [row] });
@@ -123,7 +124,7 @@ async function handleButton(interaction) {
     throw error;
   }
 
-  const choiceEmoji = choice === 'heads' ? '👑' : '🦅';
+  const choiceEmoji = choice === 'heads' ? EMOJIS.heads : EMOJIS.tails;
 
   // ── Frame 1: Coin in the air ──
   const frame1 = new EmbedBuilder()
@@ -178,15 +179,15 @@ async function handleButton(interaction) {
   // ── Frame 4: Result ──
   await sleep(800);
 
-  const resultEmoji = result.side === 'heads' ? '👑' : '🦅';
+  const resultEmoji = result.side === 'heads' ? EMOJIS.heads : EMOJIS.tails;
   const color = result.won ? COLORS.win : COLORS.lose;
   const outcomeText = result.won
     ? winBanner(result.payout, false)
     : lossBanner(bet);
 
   const coinArt = result.side === 'heads'
-    ? '     ╭─────╮\n     │ 👑  │\n     ╰─────╯'
-    : '     ╭─────╮\n     │ 🦅  │\n     ╰─────╯';
+    ? `     ╭─────╮\n     │ ${EMOJIS.heads}  │\n     ╰─────╯`
+    : `     ╭─────╮\n     │ ${EMOJIS.tails}  │\n     ╰─────╯`;
 
   const finalEmbed = new EmbedBuilder()
     .setTitle(`🪙  ${result.side.toUpperCase()}!  🪙`)
@@ -204,11 +205,11 @@ async function handleButton(interaction) {
     )
     .setColor(color)
     .addFields(
-      { name: '💰 Balance', value: `\`${result.newBalance.toLocaleString()}\``, inline: true },
+      { name: `${EMOJIS.coin} Balance`, value: `\`${result.newBalance.toLocaleString()}\``, inline: true },
       { name: '🔢 Nonce', value: `\`${result.nonce}\``, inline: true },
-      { name: '🔐 Seed', value: `\`${result.serverSeedHash.substring(0, 12)}...\``, inline: true }
+      { name: `${EMOJIS.shield} Seed`, value: `\`${result.serverSeedHash.substring(0, 12)}...\``, inline: true }
     )
-    .setFooter({ text: '🔒 Provably Fair | /fairness to verify' })
+    .setFooter({ text: `${EMOJIS.shield} Provably Fair | /fairness to verify` })
     .setTimestamp();
 
   if (result.vipLevelUp) {

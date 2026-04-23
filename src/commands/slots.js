@@ -10,9 +10,10 @@ const {
   lossBanner,
   sleep,
 } = require('../utils/animations');
+const EMOJIS = require('../utils/emojis');
 
 // Random spinning symbols for animation frames.
-const SPIN_SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '🔔', '7️⃣', '💎', '⭐', '🎰'];
+const SPIN_SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '🔔', '7️⃣', EMOJIS.diamond, '⭐', EMOJIS.slots];
 
 const data = new SlashCommandBuilder()
   .setName('slots')
@@ -57,7 +58,7 @@ async function execute(interaction) {
 
   // ── Frame 1: Machine starting ──
   const frame1 = new EmbedBuilder()
-    .setTitle('🎰  S L O T   M A C H I N E  🎰')
+    .setTitle(`${EMOJIS.slots}  S L O T   M A C H I N E  ${EMOJIS.slots}`)
     .setDescription(
       `${DIVIDER}\n` +
       slotMachine(['❓', '❓', '❓'], true) +
@@ -72,7 +73,7 @@ async function execute(interaction) {
   // ── Frame 2: First reel stops ──
   await sleep(700);
   const frame2 = new EmbedBuilder()
-    .setTitle('🎰  S L O T   M A C H I N E  🎰')
+    .setTitle(`${EMOJIS.slots}  S L O T   M A C H I N E  ${EMOJIS.slots}`)
     .setDescription(
       `${DIVIDER}\n` +
       slotMachine([reels[0], randomSymbol(), randomSymbol()]) +
@@ -85,7 +86,7 @@ async function execute(interaction) {
   // ── Frame 3: Second reel stops ──
   await sleep(700);
   const frame3 = new EmbedBuilder()
-    .setTitle('🎰  S L O T   M A C H I N E  🎰')
+    .setTitle(`${EMOJIS.slots}  S L O T   M A C H I N E  ${EMOJIS.slots}`)
     .setDescription(
       `${DIVIDER}\n` +
       slotMachine([reels[0], reels[1], randomSymbol()]) +
@@ -118,7 +119,7 @@ async function execute(interaction) {
     : 'Better luck next time!';
 
   const finalEmbed = new EmbedBuilder()
-    .setTitle(isJackpot ? '🎰💰 J A C K P O T 💰🎰' : '🎰  S L O T   M A C H I N E  🎰')
+    .setTitle(isJackpot ? `${EMOJIS.slots}${EMOJIS.coin} J A C K P O T ${EMOJIS.coin}${EMOJIS.slots}` : `${EMOJIS.slots}  S L O T   M A C H I N E  ${EMOJIS.slots}`)
     .setDescription(
       (isJackpot ? `${SPARKLE_LINE}\n` : '') +
       `${DIVIDER}\n` +
@@ -130,11 +131,11 @@ async function execute(interaction) {
     )
     .setColor(color)
     .addFields(
-      { name: '💰 Balance', value: `\`${result.newBalance.toLocaleString()}\``, inline: true },
+      { name: `${EMOJIS.coin} Balance`, value: `\`${result.newBalance.toLocaleString()}\``, inline: true },
       { name: '🔢 Nonce', value: `\`${result.nonce}\``, inline: true },
-      { name: '🔐 Seed', value: `\`${result.serverSeedHash.substring(0, 12)}...\``, inline: true }
+      { name: `${EMOJIS.shield} Seed`, value: `\`${result.serverSeedHash.substring(0, 12)}...\``, inline: true }
     )
-    .setFooter({ text: '🔒 Provably Fair | /fairness to verify' })
+    .setFooter({ text: `${EMOJIS.shield} Provably Fair | /fairness to verify` })
     .setTimestamp();
 
   if (result.vipLevelUp) {

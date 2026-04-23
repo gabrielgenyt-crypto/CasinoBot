@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const db = require('../utils/database');
 const { COLORS, DIVIDER } = require('../utils/animations');
+const EMOJIS = require('../utils/emojis');
 
 const data = new SlashCommandBuilder()
   .setName('leaderboard')
@@ -11,10 +12,10 @@ const data = new SlashCommandBuilder()
       .setDescription('Leaderboard type')
       .setRequired(false)
       .addChoices(
-        { name: '💰 Balance', value: 'balance' },
-        { name: '🎰 Total Wagered', value: 'wagered' },
+        { name: `${EMOJIS.coin} Balance`, value: 'balance' },
+        { name: `${EMOJIS.casino} Total Wagered`, value: 'wagered' },
         { name: '📈 Total Profit', value: 'profit' },
-        { name: '🏆 Most Wins', value: 'wins' }
+        { name: `${EMOJIS.trophy} Most Wins`, value: 'wins' }
       )
   );
 
@@ -35,7 +36,7 @@ async function execute(interaction) {
       .prepare('SELECT user_id, balance FROM wallets ORDER BY balance DESC LIMIT 10')
       .all();
     title = 'Richest Players';
-    titleEmoji = '💰';
+    titleEmoji = EMOJIS.coin;
     formatRow = (row, i) => {
       const medal = i < 3 ? MEDALS[i] : `\`${i + 1}.\``;
       const bar = '█'.repeat(Math.min(Math.ceil(row.balance / 1000), 15));
@@ -50,7 +51,7 @@ async function execute(interaction) {
       )
       .all();
     title = 'Most Wagered';
-    titleEmoji = '🎰';
+    titleEmoji = EMOJIS.casino;
     formatRow = (row, i) => {
       const medal = i < 3 ? MEDALS[i] : `\`${i + 1}.\``;
       return `${medal} <@${row.user_id}> — **${row.total_wagered.toLocaleString()}** wagered`;
@@ -80,7 +81,7 @@ async function execute(interaction) {
       )
       .all();
     title = 'Most Wins';
-    titleEmoji = '🏆';
+    titleEmoji = EMOJIS.trophy;
     formatRow = (row, i) => {
       const medal = i < 3 ? MEDALS[i] : `\`${i + 1}.\``;
       return `${medal} <@${row.user_id}> — **${row.win_count.toLocaleString()}** wins`;

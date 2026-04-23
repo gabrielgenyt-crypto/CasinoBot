@@ -23,7 +23,6 @@ const COMMAND_LIMITS = {
   withdraw: { maxTokens: 2, refillRate: 2, refillInterval: 300 },
   tip: { maxTokens: 3, refillRate: 3, refillInterval: 60 },
   claim: { maxTokens: 1, refillRate: 1, refillInterval: 60 },
-  daily: { maxTokens: 1, refillRate: 1, refillInterval: 60 },
 };
 
 /**
