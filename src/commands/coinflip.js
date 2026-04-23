@@ -7,6 +7,14 @@ const {
 } = require('discord.js');
 const { getBalance, ensureWallet } = require('../utils/wallet');
 const { playCoinflip } = require('../games/coinflip');
+const {
+  COLORS,
+  DIVIDER,
+  SPARKLE_LINE,
+  winBanner,
+  lossBanner,
+  sleep,
+} = require('../utils/animations');
 
 // Temporary store for pending bets (userId -> bet amount).
 // Cleared once the user picks heads or tails.
@@ -14,7 +22,7 @@ const pendingBets = new Map();
 
 const data = new SlashCommandBuilder()
   .setName('coinflip')
-  .setDescription('Flip a coin! Heads or tails -- double your bet.')
+  .setDescription('🪙 Flip a coin! Heads or tails -- double your bet.')
   .addIntegerOption((option) =>
     option
       .setName('bet')
@@ -35,7 +43,7 @@ async function execute(interaction) {
 
   if (bet > balance) {
     return interaction.reply({
-      content: `You don't have enough coins. Your balance: **${balance}**`,
+      content: `❌ Insufficient funds. Your balance: **${balance.toLocaleString()}** coins`,
       ephemeral: true,
     });
   }
@@ -44,24 +52,33 @@ async function execute(interaction) {
   pendingBets.set(userId, bet);
 
   const embed = new EmbedBuilder()
-    .setTitle('Coinflip')
+    .setTitle('🪙  C O I N F L I P  🪙')
     .setDescription(
-      `**${interaction.user.username}** wagered **${bet}** coins.\nPick a side!`
+      `${DIVIDER}\n\n` +
+      '```\n' +
+      '     ╭─────╮\n' +
+      '     │  ?  │\n' +
+      '     ╰─────╯\n' +
+      '```\n' +
+      `**${interaction.user.username}** wagered **${bet.toLocaleString()}** coins\n` +
+      'Pick a side!\n\n' +
+      DIVIDER
     )
-    .setColor(0xf1c40f)
-    .setFooter({ text: `Balance: ${balance}` });
+    .setColor(COLORS.neutral)
+    .setFooter({ text: `Balance: ${balance.toLocaleString()} coins` })
+    .setTimestamp();
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`coinflip:heads:${userId}`)
-      .setLabel('Heads')
+      .setLabel('HEADS')
       .setStyle(ButtonStyle.Primary)
-      .setEmoji('🪙'),
+      .setEmoji('👑'),
     new ButtonBuilder()
       .setCustomId(`coinflip:tails:${userId}`)
-      .setLabel('Tails')
+      .setLabel('TAILS')
       .setStyle(ButtonStyle.Secondary)
-      .setEmoji('🪙')
+      .setEmoji('🦅')
   );
 
   return interaction.reply({ embeds: [embed], components: [row] });
@@ -76,7 +93,7 @@ async function handleButton(interaction) {
   // Only the user who started the game can click.
   if (interaction.user.id !== ownerId) {
     return interaction.reply({
-      content: 'This is not your game!',
+      content: '❌ This is not your game!',
       ephemeral: true,
     });
   }
@@ -84,7 +101,7 @@ async function handleButton(interaction) {
   const bet = pendingBets.get(ownerId);
   if (!bet) {
     return interaction.reply({
-      content: 'This game has already been played or expired.',
+      content: '❌ This game has already been played or expired.',
       ephemeral: true,
     });
   }
@@ -98,7 +115,7 @@ async function handleButton(interaction) {
   } catch (error) {
     if (error.message === 'INSUFFICIENT_FUNDS') {
       return interaction.update({
-        content: 'You no longer have enough coins for this bet.',
+        content: '❌ You no longer have enough coins for this bet.',
         embeds: [],
         components: [],
       });
@@ -106,27 +123,103 @@ async function handleButton(interaction) {
     throw error;
   }
 
-  const color = result.won ? 0x2ecc71 : 0xe74c3c;
-  const outcomeText = result.won
-    ? `You won **${result.payout}** coins!`
-    : `You lost **${bet}** coins.`;
+  const choiceEmoji = choice === 'heads' ? '👑' : '🦅';
 
-  const embed = new EmbedBuilder()
-    .setTitle(`Coinflip - ${result.side.toUpperCase()}`)
+  // ── Frame 1: Coin in the air ──
+  const frame1 = new EmbedBuilder()
+    .setTitle('🪙  C O I N F L I P  🪙')
     .setDescription(
-      `${interaction.user.username} picked **${choice}**.\n` +
-      `The coin landed on **${result.side}**.\n\n` +
-      outcomeText
+      `${DIVIDER}\n\n` +
+      '```\n' +
+      '         🪙 ⬆️\n' +
+      '      *flipping*\n' +
+      '```\n' +
+      `${choiceEmoji} You picked **${choice.toUpperCase()}**\n\n` +
+      DIVIDER
+    )
+    .setColor(COLORS.pending);
+
+  await interaction.update({ embeds: [frame1], components: [] });
+
+  // ── Frame 2: Coin spinning ──
+  await sleep(600);
+  const frame2 = new EmbedBuilder()
+    .setTitle('🪙  C O I N F L I P  🪙')
+    .setDescription(
+      `${DIVIDER}\n\n` +
+      '```\n' +
+      '           🪙\n' +
+      '       *spinning*\n' +
+      '```\n' +
+      `${choiceEmoji} You picked **${choice.toUpperCase()}**\n\n` +
+      DIVIDER
+    )
+    .setColor(COLORS.pending);
+
+  await interaction.editReply({ embeds: [frame2] });
+
+  // ── Frame 3: Coin falling ──
+  await sleep(600);
+  const frame3 = new EmbedBuilder()
+    .setTitle('🪙  C O I N F L I P  🪙')
+    .setDescription(
+      `${DIVIDER}\n\n` +
+      '```\n' +
+      '      🪙 ⬇️\n' +
+      '      *falling*\n' +
+      '```\n' +
+      `${choiceEmoji} You picked **${choice.toUpperCase()}**\n\n` +
+      DIVIDER
+    )
+    .setColor(COLORS.pending);
+
+  await interaction.editReply({ embeds: [frame3] });
+
+  // ── Frame 4: Result ──
+  await sleep(800);
+
+  const resultEmoji = result.side === 'heads' ? '👑' : '🦅';
+  const color = result.won ? COLORS.win : COLORS.lose;
+  const outcomeText = result.won
+    ? winBanner(result.payout, false)
+    : lossBanner(bet);
+
+  const coinArt = result.side === 'heads'
+    ? '     ╭─────╮\n     │ 👑  │\n     ╰─────╯'
+    : '     ╭─────╮\n     │ 🦅  │\n     ╰─────╯';
+
+  const finalEmbed = new EmbedBuilder()
+    .setTitle(`🪙  ${result.side.toUpperCase()}!  🪙`)
+    .setDescription(
+      (result.won ? `${SPARKLE_LINE}\n` : '') +
+      `${DIVIDER}\n\n` +
+      '```\n' +
+      coinArt + '\n' +
+      '```\n' +
+      `${resultEmoji} The coin landed on **${result.side.toUpperCase()}**\n` +
+      `${choiceEmoji} You picked **${choice.toUpperCase()}**\n\n` +
+      `${outcomeText}\n\n` +
+      DIVIDER +
+      (result.won ? `\n${SPARKLE_LINE}` : '')
     )
     .setColor(color)
     .addFields(
-      { name: 'Balance', value: `${result.newBalance}`, inline: true },
-      { name: 'Nonce', value: `${result.nonce}`, inline: true },
-      { name: 'Seed Hash', value: `\`${result.serverSeedHash.substring(0, 16)}...\``, inline: true }
+      { name: '💰 Balance', value: `\`${result.newBalance.toLocaleString()}\``, inline: true },
+      { name: '🔢 Nonce', value: `\`${result.nonce}\``, inline: true },
+      { name: '🔐 Seed', value: `\`${result.serverSeedHash.substring(0, 12)}...\``, inline: true }
     )
-    .setFooter({ text: 'Use /fairness to verify results' });
+    .setFooter({ text: '🔒 Provably Fair | /fairness to verify' })
+    .setTimestamp();
 
-  return interaction.update({ embeds: [embed], components: [] });
+  if (result.vipLevelUp) {
+    finalEmbed.addFields({
+      name: '⭐ VIP Level Up!',
+      value: `You reached **${result.vipLevelUp.name}**!`,
+      inline: false,
+    });
+  }
+
+  return interaction.editReply({ embeds: [finalEmbed] });
 }
 
 module.exports = { data, execute, handleButton };

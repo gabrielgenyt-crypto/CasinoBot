@@ -12,18 +12,30 @@ const {
   stand,
   double,
   handValue,
-  formatHand,
 } = require('../games/blackjack');
+const {
+  COLORS,
+  DIVIDER,
+  SPARKLE_LINE,
+  sleep,
+} = require('../utils/animations');
 
 // Active games keyed by userId.
 const activeGames = new Map();
 
 const data = new SlashCommandBuilder()
   .setName('blackjack')
-  .setDescription('Play blackjack against the dealer. Hit, Stand, or Double!')
+  .setDescription('🃏 Play blackjack against the dealer. Hit, Stand, or Double!')
   .addIntegerOption((opt) =>
     opt.setName('bet').setDescription('Amount to wager').setRequired(true).setMinValue(1)
   );
+
+/**
+ * Formats a hand with fancy card boxes.
+ */
+function fancyHand(hand) {
+  return hand.map((c) => `\`[${c.display}]\``).join(' ');
+}
 
 /**
  * Builds the game embed for the current state.
@@ -31,45 +43,107 @@ const data = new SlashCommandBuilder()
 function buildEmbed(interaction, state, showDealer = false) {
   const playerVal = handValue(state.playerHand);
   const dealerCards = showDealer
-    ? formatHand(state.dealerHand)
-    : `${state.dealerHand[0].display} ??`;
+    ? fancyHand(state.dealerHand)
+    : `\`[${state.dealerHand[0].display}]\` \`[??]\``;
   const dealerVal = showDealer
     ? handValue(state.dealerHand)
     : '?';
 
-  const embed = new EmbedBuilder()
-    .setTitle('Blackjack')
-    .setColor(state.outcome ? (state.outcome === 'lose' || state.outcome === 'bust' ? 0xe74c3c : state.outcome === 'push' ? 0xf1c40f : 0x2ecc71) : 0x3498db)
-    .addFields(
-      { name: `Dealer (${dealerVal})`, value: dealerCards, inline: false },
-      { name: `${interaction.user.username} (${playerVal})`, value: formatHand(state.playerHand), inline: false }
-    );
+  let color;
+  let title = '🃏  B L A C K J A C K  🃏';
 
   if (state.outcome) {
-    let outcomeText;
     switch (state.outcome) {
     case 'blackjack':
-      outcomeText = `Blackjack! Won **${state.payout}** coins!`;
+      color = COLORS.jackpot;
+      title = '🃏✨  B L A C K J A C K !  ✨🃏';
       break;
     case 'win':
-      outcomeText = `You win! Won **${state.payout}** coins!`;
+      color = COLORS.win;
+      title = '🃏🎉  Y O U   W I N  🎉🃏';
       break;
     case 'push':
-      outcomeText = `Push. Bet of **${state.bet}** returned.`;
+      color = COLORS.warning;
+      title = '🃏🤝  P U S H  🤝🃏';
       break;
     case 'lose':
-      outcomeText = `Dealer wins. Lost **${state.bet}** coins.`;
-      break;
     case 'bust':
-      outcomeText = `Bust! Lost **${state.bet}** coins.`;
+      color = COLORS.lose;
+      title = state.outcome === 'bust'
+        ? '🃏💥  B U S T !  💥🃏'
+        : '🃏😔  D E A L E R   W I N S  😔🃏';
       break;
     default:
-      outcomeText = '';
+      color = COLORS.neutral;
     }
-    embed.setDescription(outcomeText);
-    embed.setFooter({ text: `Balance: ${state.newBalance}` });
   } else {
-    embed.setFooter({ text: `Bet: ${state.bet} | Balance: ${getBalance(state.userId)}` });
+    color = COLORS.neutral;
+  }
+
+  let description = `${DIVIDER}\n\n`;
+
+  // Dealer section.
+  description += `**Dealer** (${dealerVal})\n`;
+  description += `${dealerCards}\n\n`;
+
+  // Player section.
+  description += `**${interaction.user.username}** (${playerVal})`;
+  if (playerVal === 21 && !state.outcome) description += ' 🔥';
+  description += '\n';
+  description += `${fancyHand(state.playerHand)}\n\n`;
+
+  // Outcome section.
+  if (state.outcome) {
+    switch (state.outcome) {
+    case 'blackjack':
+      description += `${SPARKLE_LINE}\n`;
+      description += `🎰 **BLACKJACK!** Won **${state.payout.toLocaleString()}** coins!\n`;
+      description += SPARKLE_LINE;
+      break;
+    case 'win':
+      description += `🎉 **YOU WIN!** +**${state.payout.toLocaleString()}** coins\n`;
+      break;
+    case 'push':
+      description += `🤝 **Push.** Bet of **${state.bet.toLocaleString()}** returned.\n`;
+      break;
+    case 'lose':
+      description += `💀 **Dealer wins.** -**${state.bet.toLocaleString()}** coins\n`;
+      break;
+    case 'bust':
+      description += `💥 **BUST!** -**${state.bet.toLocaleString()}** coins\n`;
+      break;
+    default:
+      break;
+    }
+    description += `\n${DIVIDER}`;
+  } else {
+    description += DIVIDER;
+  }
+
+  const embed = new EmbedBuilder()
+    .setTitle(title)
+    .setDescription(description)
+    .setColor(color)
+    .setTimestamp();
+
+  if (state.outcome) {
+    embed.addFields(
+      { name: '💰 Balance', value: `\`${state.newBalance.toLocaleString()}\``, inline: true },
+      { name: '🎲 Bet', value: `\`${state.bet.toLocaleString()}\``, inline: true }
+    );
+    embed.setFooter({ text: '🔒 Provably Fair | /fairness to verify' });
+
+    if (state.vipLevelUp) {
+      embed.addFields({
+        name: '⭐ VIP Level Up!',
+        value: `You reached **${state.vipLevelUp.name}**!`,
+        inline: false,
+      });
+    }
+  } else {
+    embed.setFooter({
+      text: `Bet: ${state.bet.toLocaleString()} | Balance: ${getBalance(state.userId).toLocaleString()}`,
+    });
   }
 
   return embed;
@@ -82,16 +156,19 @@ function buildButtons(userId, canDouble) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`blackjack:hit:${userId}`)
-      .setLabel('Hit')
-      .setStyle(ButtonStyle.Primary),
+      .setLabel('HIT')
+      .setStyle(ButtonStyle.Success)
+      .setEmoji('🃏'),
     new ButtonBuilder()
       .setCustomId(`blackjack:stand:${userId}`)
-      .setLabel('Stand')
-      .setStyle(ButtonStyle.Secondary),
+      .setLabel('STAND')
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji('✋'),
     new ButtonBuilder()
       .setCustomId(`blackjack:double:${userId}`)
-      .setLabel('Double')
+      .setLabel('DOUBLE')
       .setStyle(ButtonStyle.Danger)
+      .setEmoji('⚡')
       .setDisabled(!canDouble)
   );
 }
@@ -102,7 +179,7 @@ async function execute(interaction) {
 
   if (activeGames.has(userId)) {
     return interaction.reply({
-      content: 'You already have an active blackjack game. Finish it first.',
+      content: '❌ You already have an active blackjack game. Finish it first.',
       ephemeral: true,
     });
   }
@@ -112,7 +189,7 @@ async function execute(interaction) {
 
   if (bet > balance) {
     return interaction.reply({
-      content: `Insufficient funds. Your balance: **${balance}**`,
+      content: `❌ Insufficient funds. Your balance: **${balance.toLocaleString()}** coins`,
       ephemeral: true,
     });
   }
@@ -122,15 +199,30 @@ async function execute(interaction) {
     state = startBlackjack(userId, bet);
   } catch (error) {
     if (error.message === 'INSUFFICIENT_FUNDS') {
-      return interaction.reply({ content: 'Insufficient funds.', ephemeral: true });
+      return interaction.reply({ content: '❌ Insufficient funds.', ephemeral: true });
     }
     throw error;
   }
 
+  // ── Dealing animation ──
+  const dealingEmbed = new EmbedBuilder()
+    .setTitle('🃏  B L A C K J A C K  🃏')
+    .setDescription(
+      `${DIVIDER}\n\n` +
+      '🎴 Dealing cards...\n\n' +
+      '`[??]` `[??]`\n\n' +
+      '`[??]` `[??]`\n\n' +
+      DIVIDER
+    )
+    .setColor(COLORS.pending);
+
+  const msg = await interaction.reply({ embeds: [dealingEmbed], fetchReply: true });
+  await sleep(800);
+
   // If the game resolved immediately (natural blackjack), show final state.
   if (state.outcome) {
     const embed = buildEmbed(interaction, state, true);
-    return interaction.reply({ embeds: [embed] });
+    return msg.edit({ embeds: [embed], components: [] });
   }
 
   activeGames.set(userId, state);
@@ -140,20 +232,20 @@ async function execute(interaction) {
   const embed = buildEmbed(interaction, state);
   const row = buildButtons(userId, canDouble);
 
-  return interaction.reply({ embeds: [embed], components: [row] });
+  return msg.edit({ embeds: [embed], components: [row] });
 }
 
 async function handleButton(interaction) {
   const [, action, ownerId] = interaction.customId.split(':');
 
   if (interaction.user.id !== ownerId) {
-    return interaction.reply({ content: 'This is not your game!', ephemeral: true });
+    return interaction.reply({ content: '❌ This is not your game!', ephemeral: true });
   }
 
   const state = activeGames.get(ownerId);
   if (!state) {
     return interaction.reply({
-      content: 'No active game found. Start a new one with /blackjack.',
+      content: '❌ No active game found. Start a new one with /blackjack.',
       ephemeral: true,
     });
   }
@@ -171,12 +263,12 @@ async function handleButton(interaction) {
       updatedState = double(state);
       break;
     default:
-      return interaction.reply({ content: 'Unknown action.', ephemeral: true });
+      return interaction.reply({ content: '❌ Unknown action.', ephemeral: true });
     }
   } catch (error) {
     if (error.message === 'INSUFFICIENT_FUNDS') {
       return interaction.reply({
-        content: 'Insufficient funds to double down.',
+        content: '❌ Insufficient funds to double down.',
         ephemeral: true,
       });
     }
