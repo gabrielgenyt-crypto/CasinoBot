@@ -10,6 +10,7 @@ const {
   lossBanner,
   sleep,
 } = require('../utils/animations');
+const EMOJIS = require('../utils/emojis');
 
 const data = new SlashCommandBuilder()
   .setName('crash')
@@ -38,7 +39,7 @@ function rocketTrail(current, target) {
   const filled = Math.round(ratio * maxBars);
   const empty = maxBars - filled;
   const bar = '▓'.repeat(filled) + '░'.repeat(empty);
-  return `\`${current.toFixed(2)}x\` ${bar} 🚀`;
+  return `\`${current.toFixed(2)}x\` ${bar} ${EMOJIS.rocket}`;
 }
 
 async function execute(interaction) {
@@ -83,11 +84,11 @@ async function execute(interaction) {
 
   // ── Frame 1: Launch ──
   const launchEmbed = new EmbedBuilder()
-    .setTitle('🚀  C R A S H  🚀')
+    .setTitle(`${EMOJIS.rocket}  C R A S H  ${EMOJIS.rocket}`)
     .setDescription(
       `${DIVIDER}\n\n` +
       '```\n' +
-      '  🚀 LAUNCHING...\n' +
+      `  ${EMOJIS.rocket} LAUNCHING...\n` +
       '  ▓░░░░░░░░░░░░░░\n' +
       '  1.00x\n' +
       '```\n' +
@@ -104,7 +105,7 @@ async function execute(interaction) {
     await sleep(600);
     const climbColor = step >= cashout ? COLORS.win : COLORS.neutral;
     const climbEmbed = new EmbedBuilder()
-      .setTitle('🚀  C R A S H  🚀')
+      .setTitle(`${EMOJIS.rocket}  C R A S H  ${EMOJIS.rocket}`)
       .setDescription(
         `${DIVIDER}\n\n` +
         `${rocketTrail(step, cashout)}\n\n` +
@@ -132,7 +133,7 @@ async function execute(interaction) {
   const graph = crashGraph(result.crashPoint);
 
   const finalEmbed = new EmbedBuilder()
-    .setTitle(won ? '🚀💰  CASHED OUT  💰🚀' : '💥  C R A S H E D  💥')
+    .setTitle(won ? `${EMOJIS.rocket}${EMOJIS.coin}  CASHED OUT  ${EMOJIS.coin}${EMOJIS.rocket}` : '💥  C R A S H E D  💥')
     .setDescription(
       (won && result.cashout >= 5 ? `${SPARKLE_LINE}\n` : '') +
       `${DIVIDER}\n\n` +
@@ -145,11 +146,11 @@ async function execute(interaction) {
     )
     .setColor(color)
     .addFields(
-      { name: '💰 Balance', value: `\`${result.newBalance.toLocaleString()}\``, inline: true },
+      { name: `${EMOJIS.coin} Balance`, value: `\`${result.newBalance.toLocaleString()}\``, inline: true },
       { name: '🔢 Nonce', value: `\`${result.nonce}\``, inline: true },
-      { name: '🔐 Seed', value: `\`${result.serverSeedHash.substring(0, 12)}...\``, inline: true }
+      { name: `${EMOJIS.shield} Seed`, value: `\`${result.serverSeedHash.substring(0, 12)}...\``, inline: true }
     )
-    .setFooter({ text: '🔒 Provably Fair | /fairness to verify' })
+    .setFooter({ text: `${EMOJIS.shield} Provably Fair | /fairness to verify` })
     .setTimestamp();
 
   if (result.vipLevelUp) {

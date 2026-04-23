@@ -3,6 +3,7 @@ const { getBalance, ensureWallet } = require('../utils/wallet');
 const db = require('../utils/database');
 const { COLORS, DIVIDER, progressBar } = require('../utils/animations');
 const { getVipRecord, getLevelForWagered, VIP_LEVELS } = require('../utils/vip');
+const EMOJIS = require('../utils/emojis');
 
 const data = new SlashCommandBuilder()
   .setName('balance')
@@ -35,16 +36,16 @@ async function execute(interaction) {
   let tierEmoji;
   if (balance >= 100000) {
     tier = 'WHALE';
-    tierEmoji = '🐋';
+    tierEmoji = EMOJIS.whale;
   } else if (balance >= 50000) {
     tier = 'HIGH ROLLER';
-    tierEmoji = '💎';
+    tierEmoji = EMOJIS.diamond;
   } else if (balance >= 10000) {
     tier = 'BALLER';
-    tierEmoji = '🔥';
+    tierEmoji = EMOJIS.fire;
   } else if (balance >= 1000) {
     tier = 'PLAYER';
-    tierEmoji = '🎰';
+    tierEmoji = EMOJIS.casino;
   } else {
     tier = 'ROOKIE';
     tierEmoji = '🌱';
@@ -63,7 +64,7 @@ async function execute(interaction) {
     .setDescription(
       `${DIVIDER}\n\n` +
       '```\n' +
-      `  💰 ${balance.toLocaleString()} COINS\n` +
+      `  ${EMOJIS.coin} ${balance.toLocaleString()} COINS\n` +
       '```\n' +
       `**Rank:** ${tierEmoji} ${tier}\n` +
       `**VIP:** ${vipLevel.name} (Tier ${vipLevel.level})${vipProgress}\n\n` +
@@ -77,11 +78,11 @@ async function execute(interaction) {
     )
     .addFields(
       { name: '🎮 Games', value: `\`${gamesPlayed}\``, inline: true },
-      { name: '🏆 Wins', value: `\`${wins}\``, inline: true },
+      { name: `${EMOJIS.trophy} Wins`, value: `\`${wins}\``, inline: true },
       { name: '📊 Win Rate', value: `\`${winRate}%\``, inline: true }
     )
     .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
-    .setFooter({ text: 'Use /daily to claim free coins | /stats for full stats' })
+    .setFooter({ text: 'Use /stats for full stats' })
     .setTimestamp();
 
   return interaction.reply({ embeds: [embed] });

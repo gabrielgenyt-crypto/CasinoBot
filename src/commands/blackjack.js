@@ -19,6 +19,7 @@ const {
   SPARKLE_LINE,
   sleep,
 } = require('../utils/animations');
+const EMOJIS = require('../utils/emojis');
 
 // Active games keyed by userId.
 const activeGames = new Map();
@@ -50,28 +51,28 @@ function buildEmbed(interaction, state, showDealer = false) {
     : '?';
 
   let color;
-  let title = '🃏  B L A C K J A C K  🃏';
+  let title = `${EMOJIS.blackjack}  B L A C K J A C K  ${EMOJIS.blackjack}`;
 
   if (state.outcome) {
     switch (state.outcome) {
     case 'blackjack':
       color = COLORS.jackpot;
-      title = '🃏✨  B L A C K J A C K !  ✨🃏';
+      title = `${EMOJIS.blackjack}✨  B L A C K J A C K !  ✨${EMOJIS.blackjack}`;
       break;
     case 'win':
       color = COLORS.win;
-      title = '🃏🎉  Y O U   W I N  🎉🃏';
+      title = `${EMOJIS.blackjack}${EMOJIS.winner}  Y O U   W I N  ${EMOJIS.winner}${EMOJIS.blackjack}`;
       break;
     case 'push':
       color = COLORS.warning;
-      title = '🃏🤝  P U S H  🤝🃏';
+      title = `${EMOJIS.blackjack}🤝  P U S H  🤝${EMOJIS.blackjack}`;
       break;
     case 'lose':
     case 'bust':
       color = COLORS.lose;
       title = state.outcome === 'bust'
-        ? '🃏💥  B U S T !  💥🃏'
-        : '🃏😔  D E A L E R   W I N S  😔🃏';
+        ? `${EMOJIS.blackjack}💥  B U S T !  💥${EMOJIS.blackjack}`
+        : `${EMOJIS.blackjack}😔  D E A L E R   W I N S  😔${EMOJIS.blackjack}`;
       break;
     default:
       color = COLORS.neutral;
@@ -128,10 +129,10 @@ function buildEmbed(interaction, state, showDealer = false) {
 
   if (state.outcome) {
     embed.addFields(
-      { name: '💰 Balance', value: `\`${state.newBalance.toLocaleString()}\``, inline: true },
-      { name: '🎲 Bet', value: `\`${state.bet.toLocaleString()}\``, inline: true }
+      { name: `${EMOJIS.coin} Balance`, value: `\`${state.newBalance.toLocaleString()}\``, inline: true },
+      { name: `${EMOJIS.blackjack} Bet`, value: `\`${state.bet.toLocaleString()}\``, inline: true }
     );
-    embed.setFooter({ text: '🔒 Provably Fair | /fairness to verify' });
+    embed.setFooter({ text: `${EMOJIS.shield} Provably Fair | /fairness to verify` });
 
     if (state.vipLevelUp) {
       embed.addFields({
@@ -168,7 +169,7 @@ function buildButtons(userId, canDouble) {
       .setCustomId(`blackjack:double:${userId}`)
       .setLabel('DOUBLE')
       .setStyle(ButtonStyle.Danger)
-      .setEmoji('⚡')
+      .setEmoji('1496967698431738070')
       .setDisabled(!canDouble)
   );
 }
@@ -206,7 +207,7 @@ async function execute(interaction) {
 
   // ── Dealing animation ──
   const dealingEmbed = new EmbedBuilder()
-    .setTitle('🃏  B L A C K J A C K  🃏')
+    .setTitle(`${EMOJIS.blackjack}  B L A C K J A C K  ${EMOJIS.blackjack}`)
     .setDescription(
       `${DIVIDER}\n\n` +
       '🎴 Dealing cards...\n\n' +

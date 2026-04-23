@@ -11,6 +11,7 @@ const {
   DIVIDER,
   sleep,
 } = require('../utils/animations');
+const EMOJIS = require('../utils/emojis');
 
 // Active lobbies keyed by channelId (one game per channel).
 const lobbies = new Map();
@@ -231,17 +232,17 @@ async function runGame(interaction, lobby, channelId) {
   const newBalance = updateBalance(winner.id, totalPot, 'russian roulette winner');
 
   const winEmbed = new EmbedBuilder()
-    .setTitle('🔫🏆  S U R V I V O R  🏆🔫')
+    .setTitle(`🔫${EMOJIS.trophy}  S U R V I V O R  ${EMOJIS.trophy}🔫`)
     .setDescription(
       '✦ ✧ ✦ ✧ ✦ ✧ ✦ ✧ ✦ ✧ ✦ ✧ ✦ ✧ ✦\n' +
       `${DIVIDER}\n\n` +
       '```\n' +
-      '  🏆 WINNER WINNER! 🏆\n' +
+      `  ${EMOJIS.trophy} WINNER WINNER! ${EMOJIS.trophy}\n` +
       '```\n' +
       `🎉 **${winner.username}** survived and takes the pot!\n\n` +
-      `💰 **+${totalPot.toLocaleString()} coins**\n\n` +
+      `${EMOJIS.coin} **+${totalPot.toLocaleString()} coins**\n\n` +
       '**Final standings:**\n' +
-      `🏆 <@${winner.id}> — **WINNER**\n` +
+      `${EMOJIS.trophy} <@${winner.id}> — **WINNER**\n` +
       eliminated.reverse().map((p, i) =>
         `\`${i + 2}.\` 💀 <@${p.id}>`
       ).join('\n') + '\n\n' +
@@ -250,9 +251,9 @@ async function runGame(interaction, lobby, channelId) {
     )
     .setColor(COLORS.jackpot)
     .addFields(
-      { name: '💰 Prize', value: `\`${totalPot.toLocaleString()}\``, inline: true },
+      { name: `${EMOJIS.coin} Prize`, value: `\`${totalPot.toLocaleString()}\``, inline: true },
       { name: '👥 Players', value: `\`${players.length}\``, inline: true },
-      { name: '💰 Winner Balance', value: `\`${newBalance.toLocaleString()}\``, inline: true }
+      { name: `${EMOJIS.coin} Winner Balance`, value: `\`${newBalance.toLocaleString()}\``, inline: true }
     )
     .setFooter({ text: 'Only the brave survive...' })
     .setTimestamp();

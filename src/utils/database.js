@@ -32,11 +32,6 @@ db.exec(`
     server_seed_hash TEXT NOT NULL
   );
 
-  CREATE TABLE IF NOT EXISTS daily_claims (
-    user_id TEXT PRIMARY KEY,
-    last_claim TEXT NOT NULL
-  );
-
   CREATE TABLE IF NOT EXISTS game_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id TEXT NOT NULL,

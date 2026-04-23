@@ -8,15 +8,6 @@ const { processAutoWithdrawals } = require('../services/withdrawProcessor');
  * @param {import('discord.js').Client} client - The Discord.js client.
  */
 const startCronJobs = (client) => {
-  // Midnight UTC: clean expired daily claim records.
-  cron.schedule('0 0 * * *', () => {
-    const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-    const result = db
-      .prepare('DELETE FROM daily_claims WHERE last_claim < ?')
-      .run(cutoff);
-    console.log(`[CRON] Cleaned ${result.changes} expired daily claim(s).`);
-  }, { timezone: 'UTC' });
-
   // Midnight UTC: clean expired self-exclusions.
   cron.schedule('0 0 * * *', () => {
     const now = new Date().toISOString();

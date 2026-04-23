@@ -9,6 +9,7 @@ const {
   lossBanner,
   sleep,
 } = require('../utils/animations');
+const EMOJIS = require('../utils/emojis');
 
 // Dice face emojis for animation.
 const DICE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
@@ -109,7 +110,7 @@ async function execute(interaction) {
   // ── Frame 1: Rolling ──
   const randFace = () => DICE_FACES[Math.floor(Math.random() * DICE_FACES.length)];
   const frame1 = new EmbedBuilder()
-    .setTitle('🎲  D I C E  🎲')
+    .setTitle(`${EMOJIS.dice}  D I C E  ${EMOJIS.dice}`)
     .setDescription(
       `${DIVIDER}\n\n` +
       `# ${randFace()}  ${randFace()}  ${randFace()}\n\n` +
@@ -124,7 +125,7 @@ async function execute(interaction) {
   // ── Frame 2: Still rolling ──
   await sleep(600);
   const frame2 = new EmbedBuilder()
-    .setTitle('🎲  D I C E  🎲')
+    .setTitle(`${EMOJIS.dice}  D I C E  ${EMOJIS.dice}`)
     .setDescription(
       `${DIVIDER}\n\n` +
       `# ${randFace()}  ${randFace()}  ${randFace()}\n\n` +
@@ -138,7 +139,7 @@ async function execute(interaction) {
   // ── Frame 3: Slowing down ──
   await sleep(600);
   const frame3 = new EmbedBuilder()
-    .setTitle('🎲  D I C E  🎲')
+    .setTitle(`${EMOJIS.dice}  D I C E  ${EMOJIS.dice}`)
     .setDescription(
       `${DIVIDER}\n\n` +
       `# ${randFace()}  ${randFace()}  ${randFace()}\n\n` +
@@ -166,13 +167,13 @@ async function execute(interaction) {
   const finalEmbed = new EmbedBuilder()
     .setTitle(
       isBigWin
-        ? `🎲💰  ROLLED ${result.roll}  💰🎲`
-        : `🎲  ROLLED ${result.roll}  🎲`
+        ? `${EMOJIS.dice}${EMOJIS.coin}  ROLLED ${result.roll}  ${EMOJIS.coin}${EMOJIS.dice}`
+        : `${EMOJIS.dice}  ROLLED ${result.roll}  ${EMOJIS.dice}`
     )
     .setDescription(
       (isBigWin ? `${SPARKLE_LINE}\n` : '') +
       `${DIVIDER}\n\n` +
-      `# 🎲 ${result.roll}\n\n` +
+      `# ${EMOJIS.dice} ${result.roll}\n\n` +
       `${rollSlider(result.roll, target, direction)}\n\n` +
       `${resultEmoji} ${comparison}\n` +
       `${dirEmoji} Target: **${direction} ${target}**\n\n` +
@@ -184,11 +185,11 @@ async function execute(interaction) {
     .addFields(
       { name: '🎯 Multiplier', value: `\`${result.multiplier}x\``, inline: true },
       { name: '📊 Win Chance', value: `\`${winChancePercent}%\``, inline: true },
-      { name: '💰 Balance', value: `\`${result.newBalance.toLocaleString()}\``, inline: true },
+      { name: `${EMOJIS.coin} Balance`, value: `\`${result.newBalance.toLocaleString()}\``, inline: true },
       { name: '🔢 Nonce', value: `\`${result.nonce}\``, inline: true },
-      { name: '🔐 Seed', value: `\`${result.serverSeedHash.substring(0, 12)}...\``, inline: true }
+      { name: `${EMOJIS.shield} Seed`, value: `\`${result.serverSeedHash.substring(0, 12)}...\``, inline: true }
     )
-    .setFooter({ text: '🔒 Provably Fair | /fairness to verify' })
+    .setFooter({ text: `${EMOJIS.shield} Provably Fair | /fairness to verify` })
     .setTimestamp();
 
   if (result.vipLevelUp) {
