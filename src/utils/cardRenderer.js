@@ -2932,6 +2932,285 @@ function renderBlackjackAnim({ playerName = '' } = {}) {
   });
 }
 
+// ─── Dashboard / Homepage Renderer ──────────────────────────────────────────
+
+const DASH_W = 720;
+const DASH_GAME_COLS = 4;
+const DASH_GAME_TILE = 140;
+const DASH_GAME_TILE_H = 64;
+const DASH_GAME_GAP = 12;
+const DASH_PAD = 28;
+
+/**
+ * The full list of casino games rendered on the dashboard card.
+ * Each entry has a display name, a short description, an icon character,
+ * and a neon accent color.
+ */
+const DASHBOARD_GAMES = [
+  { name: 'Blackjack', desc: 'Beat the dealer', icon: '\u2660', color: '#1a6b3c' },
+  { name: 'Slots', desc: 'Spin to win', icon: '\u2666', color: '#9b59b6' },
+  { name: 'Dice', desc: 'Over or under', icon: '\u2684', color: '#3498db' },
+  { name: 'Roulette', desc: 'Pick your number', icon: '\u25CE', color: '#e53935' },
+  { name: 'Coinflip', desc: '50/50 flip', icon: '\u00A2', color: '#ffd700' },
+  { name: 'Crash', desc: 'Cash out in time', icon: '\u25B2', color: '#ff6b35' },
+  { name: 'Mines', desc: 'Avoid the mines', icon: '\u2716', color: '#00e5ff' },
+  { name: 'Plinko', desc: 'Drop the ball', icon: '\u25CF', color: '#ff9900' },
+  { name: 'Wheel', desc: 'Spin the wheel', icon: '\u2609', color: '#e91e63' },
+  { name: 'Keno', desc: 'Match the draw', icon: '\u2605', color: '#8bc34a' },
+  { name: 'Limbo', desc: 'Beat the target', icon: '\u2191', color: '#00bcd4' },
+  { name: 'Tower', desc: 'Climb the floors', icon: '\u25B3', color: '#ff5722' },
+  { name: 'Hi-Lo', desc: 'Higher or lower', icon: '\u2195', color: '#7c4dff' },
+  { name: 'Russian R.', desc: 'Last one standing', icon: '\u2739', color: '#f44336' },
+];
+
+/**
+ * Renders a full "website homepage" style dashboard card as a PNG buffer.
+ *
+ * The card shows the player's balance, tier, VIP status, quick stats, and a
+ * visual grid of all available casino games — designed to be sent as a
+ * Discord embed image.
+ *
+ * @param {object} options
+ * @param {string} options.playerName - Display name.
+ * @param {number} options.balance - Current coin balance.
+ * @param {string} options.tier - Tier label (WHALE, HIGH ROLLER, etc.).
+ * @param {number} options.gamesPlayed - Total games played.
+ * @param {number} options.wins - Total wins.
+ * @param {string} options.winRate - Win rate string (e.g. "52.3").
+ * @param {string} options.vipName - VIP level name.
+ * @param {number} options.vipLevel - VIP tier number.
+ * @returns {Buffer} PNG image buffer.
+ */
+function renderDashboard({
+  playerName = 'Player',
+  balance = 0,
+  tier = 'ROOKIE',
+  gamesPlayed = 0,
+  wins = 0,
+  winRate = '0.0',
+  vipName = 'None',
+  vipLevel = 0,
+}) {
+  // Calculate dynamic height based on game grid rows.
+  const gameRows = Math.ceil(DASHBOARD_GAMES.length / DASH_GAME_COLS);
+  const headerH = 170; // balance section + stats row
+  const gamesHeaderH = 40; // "GAMES" section title
+  const gamesGridH = gameRows * (DASH_GAME_TILE_H + DASH_GAME_GAP) - DASH_GAME_GAP;
+  const footerH = 44;
+  const canvasH = DASH_PAD + headerH + gamesHeaderH + gamesGridH + footerH + DASH_PAD;
+
+  const canvas = createCanvas(DASH_W, canvasH);
+  const ctx = canvas.getContext('2d');
+
+  // ── Background ──
+  gradientRect(ctx, 0, 0, DASH_W, canvasH, 18, '#08090d', '#0d1117');
+
+  // Decorative glow spots.
+  glowCircle(ctx, 120, 60, 180, 'rgba(255, 215, 0, 0.04)');
+  glowCircle(ctx, DASH_W - 100, canvasH - 80, 200, 'rgba(0, 229, 255, 0.03)');
+
+  // ── Outer border ──
+  roundRect(ctx, 0, 0, DASH_W, canvasH, 18);
+  ctx.strokeStyle = '#ffd700';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Inner subtle border.
+  roundRect(ctx, 6, 6, DASH_W - 12, canvasH - 12, 14);
+  ctx.strokeStyle = 'rgba(255, 215, 0, 0.12)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  let curY = DASH_PAD;
+
+  // ── Header: Casino title bar ──
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 22px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('CryptoVault Casino', DASH_PAD, curY);
+
+  // Tier badge (top-right).
+  const tierColors = {
+    WHALE: '#00e5ff',
+    'HIGH ROLLER': '#ffd700',
+    BALLER: '#ff6b35',
+    PLAYER: '#00ff88',
+    ROOKIE: '#888899',
+  };
+  const tierColor = tierColors[tier] || '#888899';
+  ctx.font = 'bold 12px Arial, sans-serif';
+  ctx.textAlign = 'right';
+  const tierTextW = ctx.measureText(tier).width;
+  const tierBadgeX = DASH_W - DASH_PAD - tierTextW - 16;
+  const tierBadgeY = curY + 2;
+  roundRect(ctx, tierBadgeX, tierBadgeY, tierTextW + 16, 22, 11);
+  ctx.fillStyle = tierColor;
+  ctx.globalAlpha = 0.15;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = tierColor;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = tierColor;
+  ctx.font = 'bold 12px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(tier, tierBadgeX + (tierTextW + 16) / 2, tierBadgeY + 11);
+
+  curY += 32;
+  glowLine(ctx, DASH_PAD, curY, DASH_W - DASH_PAD * 2, '#ffd700');
+  curY += 12;
+
+  // ── Player name ──
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(playerName, DASH_PAD, curY);
+
+  // VIP badge next to name.
+  if (vipLevel > 0) {
+    const nameW = ctx.measureText(playerName).width;
+    ctx.fillStyle = '#e91e63';
+    ctx.font = 'bold 11px Arial, sans-serif';
+    ctx.fillText(`VIP ${vipLevel} - ${vipName}`, DASH_PAD + nameW + 12, curY + 3);
+  }
+  curY += 24;
+
+  // ── Balance display ──
+  ctx.fillStyle = '#666688';
+  ctx.font = '12px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('BALANCE', DASH_PAD, curY);
+  curY += 16;
+
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 44px Arial, sans-serif';
+  ctx.fillText(balance.toLocaleString(), DASH_PAD, curY);
+
+  const balW = ctx.measureText(balance.toLocaleString()).width;
+  ctx.fillStyle = '#888899';
+  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.fillText('COINS', DASH_PAD + balW + 12, curY + 22);
+  curY += 56;
+
+  // ── Stats row ──
+  glowLine(ctx, DASH_PAD, curY, DASH_W - DASH_PAD * 2, '#333355');
+  curY += 12;
+
+  const statItems = [
+    { label: 'GAMES PLAYED', value: String(gamesPlayed), color: '#e0e0e0' },
+    { label: 'WINS', value: String(wins), color: '#00ff88' },
+    { label: 'WIN RATE', value: `${winRate}%`, color: '#00ff88' },
+    { label: 'VIP TIER', value: vipLevel > 0 ? `${vipName} (T${vipLevel})` : 'None', color: '#e91e63' },
+  ];
+
+  const statColW = (DASH_W - DASH_PAD * 2) / statItems.length;
+  for (let i = 0; i < statItems.length; i++) {
+    const sx = DASH_PAD + i * statColW;
+
+    ctx.fillStyle = '#555577';
+    ctx.font = '10px Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(statItems[i].label, sx, curY);
+
+    ctx.fillStyle = statItems[i].color;
+    ctx.font = 'bold 16px Arial, sans-serif';
+    ctx.fillText(statItems[i].value, sx, curY + 14);
+  }
+  curY += 42;
+
+  // ── Games section ──
+  glowLine(ctx, DASH_PAD, curY, DASH_W - DASH_PAD * 2, '#ffd700');
+  curY += 14;
+
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('GAMES', DASH_PAD, curY);
+
+  ctx.fillStyle = '#555577';
+  ctx.font = '12px Arial, sans-serif';
+  ctx.fillText(`${DASHBOARD_GAMES.length} provably fair games`, DASH_PAD + 70, curY + 3);
+  curY += 28;
+
+  // ── Game tiles grid ──
+  const gridTotalW = DASH_GAME_COLS * DASH_GAME_TILE + (DASH_GAME_COLS - 1) * DASH_GAME_GAP;
+  const gridStartX = (DASH_W - gridTotalW) / 2;
+
+  for (let i = 0; i < DASHBOARD_GAMES.length; i++) {
+    const col = i % DASH_GAME_COLS;
+    const row = Math.floor(i / DASH_GAME_COLS);
+    const tx = gridStartX + col * (DASH_GAME_TILE + DASH_GAME_GAP);
+    const ty = curY + row * (DASH_GAME_TILE_H + DASH_GAME_GAP);
+    const game = DASHBOARD_GAMES[i];
+
+    // Tile background.
+    roundRect(ctx, tx, ty, DASH_GAME_TILE, DASH_GAME_TILE_H, 10);
+    const tileGrad = ctx.createLinearGradient(tx, ty, tx, ty + DASH_GAME_TILE_H);
+    tileGrad.addColorStop(0, 'rgba(255, 255, 255, 0.04)');
+    tileGrad.addColorStop(1, 'rgba(0, 0, 0, 0.1)');
+    ctx.fillStyle = tileGrad;
+    ctx.fill();
+    ctx.strokeStyle = game.color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Icon glow (convert hex color to rgba with low opacity).
+    const hexToGlow = (hex) => {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      return `rgba(${r}, ${g}, ${b}, 0.15)`;
+    };
+    glowCircle(ctx, tx + 24, ty + DASH_GAME_TILE_H / 2, 18, hexToGlow(game.color));
+
+    // Icon circle.
+    ctx.beginPath();
+    ctx.arc(tx + 24, ty + DASH_GAME_TILE_H / 2, 14, 0, Math.PI * 2);
+    ctx.fillStyle = game.color;
+    ctx.globalAlpha = 0.2;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Icon character.
+    ctx.fillStyle = game.color;
+    ctx.font = 'bold 16px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(game.icon, tx + 24, ty + DASH_GAME_TILE_H / 2);
+
+    // Game name.
+    ctx.fillStyle = '#e0e0e0';
+    ctx.font = 'bold 13px Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(game.name, tx + 46, ty + 14);
+
+    // Game description.
+    ctx.fillStyle = '#666688';
+    ctx.font = '11px Arial, sans-serif';
+    ctx.fillText(game.desc, tx + 46, ty + 32);
+  }
+
+  curY += gamesGridH + 20;
+
+  // ── Footer ──
+  glowLine(ctx, DASH_PAD, curY, DASH_W - DASH_PAD * 2, '#333355');
+  curY += 12;
+
+  ctx.fillStyle = '#444466';
+  ctx.font = '11px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText('All games are provably fair  \u2022  /fairness to verify  \u2022  /help for commands', DASH_W / 2, curY);
+
+  return canvas.toBuffer('image/png');
+}
+
 module.exports = {
   renderBlackjackTable,
   renderCoinflip,
@@ -2961,4 +3240,5 @@ module.exports = {
   renderPlinkoAnim,
   renderWheelAnim,
   renderBlackjackAnim,
+  renderDashboard,
 };
