@@ -4,6 +4,7 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  AttachmentBuilder,
 } = require('discord.js');
 const { getBalance, ensureWallet } = require('../utils/wallet');
 const { playCoinflip } = require('../games/coinflip');
@@ -16,6 +17,7 @@ const {
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
+const { renderCoinflip } = require('../utils/cardRenderer');
 
 // Temporary store for pending bets (userId -> bet amount).
 // Cleared once the user picks heads or tails.
@@ -185,18 +187,19 @@ async function handleButton(interaction) {
     ? winBanner(result.payout, false)
     : lossBanner(bet);
 
-  const coinArt = result.side === 'heads'
-    ? `     ╭─────╮\n     │ ${EMOJIS.heads}  │\n     ╰─────╯`
-    : `     ╭─────╮\n     │ ${EMOJIS.tails}  │\n     ╰─────╯`;
+  // Render the coinflip result image.
+  const pngBuffer = renderCoinflip({
+    side: result.side,
+    won: result.won,
+    playerName: interaction.user.username,
+  });
+  const attachment = new AttachmentBuilder(pngBuffer, { name: 'coinflip.png' });
 
   const finalEmbed = new EmbedBuilder()
     .setTitle(`🪙  ${result.side.toUpperCase()}!  🪙`)
     .setDescription(
       (result.won ? `${SPARKLE_LINE}\n` : '') +
       `${DIVIDER}\n\n` +
-      '```\n' +
-      coinArt + '\n' +
-      '```\n' +
       `${resultEmoji} The coin landed on **${result.side.toUpperCase()}**\n` +
       `${choiceEmoji} You picked **${choice.toUpperCase()}**\n\n` +
       `${outcomeText}\n\n` +
@@ -204,6 +207,7 @@ async function handleButton(interaction) {
       (result.won ? `\n${SPARKLE_LINE}` : '')
     )
     .setColor(color)
+    .setImage('attachment://coinflip.png')
     .addFields(
       { name: `${EMOJIS.coin} Balance`, value: `\`${result.newBalance.toLocaleString()}\``, inline: true },
       { name: '🔢 Nonce', value: `\`${result.nonce}\``, inline: true },
@@ -220,7 +224,7 @@ async function handleButton(interaction) {
     });
   }
 
-  return interaction.editReply({ embeds: [finalEmbed] });
+  return interaction.editReply({ embeds: [finalEmbed], files: [attachment] });
 }
 
 module.exports = { data, execute, handleButton };

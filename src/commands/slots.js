@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const { getBalance, ensureWallet } = require('../utils/wallet');
 const { playSlots } = require('../games/slots');
 const {
@@ -11,6 +11,7 @@ const {
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
+const { renderSlots } = require('../utils/cardRenderer');
 
 // Random spinning symbols for animation frames.
 const SPIN_SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '🔔', '7️⃣', EMOJIS.diamond, '⭐', EMOJIS.slots];
@@ -118,6 +119,15 @@ async function execute(interaction) {
     ? `Multiplier: **${result.multiplier}x**`
     : 'Better luck next time!';
 
+  // Render the slot machine result image.
+  const pngBuffer = renderSlots({
+    reels: result.reels,
+    won: result.won,
+    multiplier: result.multiplier,
+    playerName: interaction.user.username,
+  });
+  const attachment = new AttachmentBuilder(pngBuffer, { name: 'slots.png' });
+
   const finalEmbed = new EmbedBuilder()
     .setTitle(isJackpot ? `${EMOJIS.slots}${EMOJIS.coin} J A C K P O T ${EMOJIS.coin}${EMOJIS.slots}` : `${EMOJIS.slots}  S L O T   M A C H I N E  ${EMOJIS.slots}`)
     .setDescription(
@@ -130,6 +140,7 @@ async function execute(interaction) {
       (isJackpot ? `\n${SPARKLE_LINE}` : '')
     )
     .setColor(color)
+    .setImage('attachment://slots.png')
     .addFields(
       { name: `${EMOJIS.coin} Balance`, value: `\`${result.newBalance.toLocaleString()}\``, inline: true },
       { name: '🔢 Nonce', value: `\`${result.nonce}\``, inline: true },
@@ -146,7 +157,7 @@ async function execute(interaction) {
     });
   }
 
-  return msg.edit({ embeds: [finalEmbed] });
+  return msg.edit({ embeds: [finalEmbed], files: [attachment] });
 }
 
 module.exports = { data, execute };

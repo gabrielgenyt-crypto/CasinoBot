@@ -4,6 +4,7 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  AttachmentBuilder,
 } = require('discord.js');
 const { getBalance, updateBalance, ensureWallet } = require('../utils/wallet');
 const {
@@ -12,6 +13,7 @@ const {
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
+const { renderRussianRoulette } = require('../utils/cardRenderer');
 
 // Active lobbies keyed by channelId (one game per channel).
 const lobbies = new Map();
@@ -231,6 +233,14 @@ async function runGame(interaction, lobby, channelId) {
   const winner = alive[0];
   const newBalance = updateBalance(winner.id, totalPot, 'russian roulette winner');
 
+  // Render the revolver cylinder image.
+  const pngBuffer = renderRussianRoulette({
+    players,
+    winnerUsername: winner.username,
+    pot: totalPot,
+  });
+  const attachment = new AttachmentBuilder(pngBuffer, { name: 'russianroulette.png' });
+
   const winEmbed = new EmbedBuilder()
     .setTitle(`🔫${EMOJIS.trophy}  S U R V I V O R  ${EMOJIS.trophy}🔫`)
     .setDescription(
@@ -250,6 +260,7 @@ async function runGame(interaction, lobby, channelId) {
       '✦ ✧ ✦ ✧ ✦ ✧ ✦ ✧ ✦ ✧ ✦ ✧ ✦ ✧ ✦'
     )
     .setColor(COLORS.jackpot)
+    .setImage('attachment://russianroulette.png')
     .addFields(
       { name: `${EMOJIS.coin} Prize`, value: `\`${totalPot.toLocaleString()}\``, inline: true },
       { name: '👥 Players', value: `\`${players.length}\``, inline: true },
@@ -258,7 +269,7 @@ async function runGame(interaction, lobby, channelId) {
     .setFooter({ text: 'Only the brave survive...' })
     .setTimestamp();
 
-  await interaction.editReply({ embeds: [winEmbed] });
+  await interaction.editReply({ embeds: [winEmbed], files: [attachment] });
 
   // Clean up the lobby.
   lobbies.delete(channelId);

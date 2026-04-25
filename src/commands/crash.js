@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const { getBalance, ensureWallet } = require('../utils/wallet');
 const { playCrash } = require('../games/crash');
 const {
@@ -11,6 +11,7 @@ const {
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
+const { renderCrash } = require('../utils/cardRenderer');
 
 const data = new SlashCommandBuilder()
   .setName('crash')
@@ -132,6 +133,15 @@ async function execute(interaction) {
 
   const graph = crashGraph(result.crashPoint);
 
+  // Render the crash graph image.
+  const pngBuffer = renderCrash({
+    crashPoint: result.crashPoint,
+    cashout: result.cashout,
+    won,
+    playerName: interaction.user.username,
+  });
+  const attachment = new AttachmentBuilder(pngBuffer, { name: 'crash.png' });
+
   const finalEmbed = new EmbedBuilder()
     .setTitle(won ? `${EMOJIS.rocket}${EMOJIS.coin}  CASHED OUT  ${EMOJIS.coin}${EMOJIS.rocket}` : '💥  C R A S H E D  💥')
     .setDescription(
@@ -145,6 +155,7 @@ async function execute(interaction) {
       (won && result.cashout >= 5 ? `\n${SPARKLE_LINE}` : '')
     )
     .setColor(color)
+    .setImage('attachment://crash.png')
     .addFields(
       { name: `${EMOJIS.coin} Balance`, value: `\`${result.newBalance.toLocaleString()}\``, inline: true },
       { name: '🔢 Nonce', value: `\`${result.nonce}\``, inline: true },
@@ -161,7 +172,7 @@ async function execute(interaction) {
     });
   }
 
-  return msg.edit({ embeds: [finalEmbed] });
+  return msg.edit({ embeds: [finalEmbed], files: [attachment] });
 }
 
 module.exports = { data, execute };
