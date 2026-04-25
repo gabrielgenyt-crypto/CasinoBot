@@ -1,8 +1,10 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const db = require('../utils/database');
 const { getBalance, updateBalance, ensureWallet } = require('../utils/wallet');
 const { validateAddress, isBlockedAddress } = require('../utils/addressValidator');
 const { log, ACTIONS } = require('../utils/auditLog');
+const { COLORS } = require('../utils/animations');
+const { renderWithdraw } = require('../utils/cardRenderer');
 
 const SUPPORTED_CHAINS = ['ETH', 'BSC', 'SOL', 'MATIC'];
 const DAILY_LIMIT = 50000;
@@ -114,20 +116,25 @@ async function execute(interaction) {
     details: JSON.stringify({ id: result.lastInsertRowid, chain, address, amount, needsApproval }),
   });
 
+  const statusText = needsApproval ? 'Pending Admin Approval' : 'Pending Processing';
+
+  const pngBuffer = renderWithdraw({
+    requestId: result.lastInsertRowid,
+    amount,
+    chain,
+    address,
+    status: statusText,
+    needsApproval,
+  });
+  const attachment = new AttachmentBuilder(pngBuffer, { name: 'withdraw.png' });
+
   const embed = new EmbedBuilder()
     .setTitle('Withdrawal Request Created')
-    .setColor(needsApproval ? 0xf1c40f : 0x2ecc71)
-    .addFields(
-      { name: 'Request ID', value: `#${result.lastInsertRowid}`, inline: true },
-      { name: 'Amount', value: `${amount}`, inline: true },
-      { name: 'Chain', value: chain, inline: true },
-      { name: 'Address', value: `\`${address}\``, inline: false },
-      { name: 'Status', value: needsApproval ? 'Pending Admin Approval (large amount)' : 'Pending Processing', inline: false }
-    )
-    .setFooter({ text: 'Blockchain transaction integration required for automatic processing.' })
+    .setColor(needsApproval ? COLORS.warning : COLORS.win)
+    .setImage('attachment://withdraw.png')
     .setTimestamp();
 
-  return interaction.reply({ embeds: [embed], ephemeral: true });
+  return interaction.reply({ embeds: [embed], files: [attachment], ephemeral: true });
 }
 
 module.exports = { data, execute };

@@ -171,6 +171,14 @@ db.exec(`
     total_lost_session INTEGER NOT NULL DEFAULT 0,
     last_warning TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS daily_rewards (
+    user_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    streak INTEGER NOT NULL DEFAULT 1,
+    last_claimed TEXT NOT NULL,
+    PRIMARY KEY (user_id, type)
+  );
 `);
 
 module.exports = db;

@@ -201,7 +201,7 @@ async function execute(interaction) {
       { name: '🔢 Nonce', value: `\`${result.nonce}\``, inline: true },
       { name: `${EMOJIS.shield} Seed`, value: `\`${result.serverSeedHash.substring(0, 12)}...\``, inline: true }
     )
-    .setFooter({ text: `${EMOJIS.shield} Provably Fair | /fairness to verify` })
+    .setFooter({ text: `${EMOJIS.shield} Provably Fair | /fairness` })
     .setTimestamp();
 
   if (result.vipLevelUp) {

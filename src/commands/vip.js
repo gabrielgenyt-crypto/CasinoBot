@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const { ensureWallet, updateBalance } = require('../utils/wallet');
 const {
   VIP_LEVELS,
@@ -6,6 +6,8 @@ const {
   getLevelForWagered,
   claimCashback,
 } = require('../utils/vip');
+const { COLORS } = require('../utils/animations');
+const { renderVip } = require('../utils/cardRenderer');
 
 const data = new SlashCommandBuilder()
   .setName('vip')
@@ -30,28 +32,28 @@ async function execute(interaction) {
     const currentLevel = getLevelForWagered(record.total_wagered);
     const nextLevel = VIP_LEVELS[currentLevel.level + 1];
 
+    const progress = nextLevel
+      ? record.total_wagered / nextLevel.threshold
+      : 1;
+
+    const pngBuffer = renderVip({
+      playerName: interaction.user.username,
+      levelName: currentLevel.name,
+      levelNum: currentLevel.level,
+      totalWagered: record.total_wagered,
+      cashbackRate: (currentLevel.cashbackRate * 100).toFixed(1),
+      nextLevelName: nextLevel ? nextLevel.name : null,
+      progress,
+    });
+    const attachment = new AttachmentBuilder(pngBuffer, { name: 'vip.png' });
+
     const embed = new EmbedBuilder()
       .setTitle(`VIP Status — ${interaction.user.username}`)
-      .setColor(currentLevel.level >= 4 ? 0xe91e63 : currentLevel.level >= 2 ? 0xf1c40f : 0x95a5a6)
-      .addFields(
-        { name: 'Level', value: `**${currentLevel.name}** (Tier ${currentLevel.level})`, inline: true },
-        { name: 'Total Wagered', value: `${record.total_wagered}`, inline: true },
-        { name: 'Cashback Rate', value: `${(currentLevel.cashbackRate * 100).toFixed(1)}%`, inline: true }
-      );
+      .setColor(COLORS.vip)
+      .setImage('attachment://vip.png')
+      .setTimestamp();
 
-    if (nextLevel) {
-      const remaining = nextLevel.threshold - record.total_wagered;
-      const progress = ((record.total_wagered / nextLevel.threshold) * 100).toFixed(1);
-      embed.addFields({
-        name: `Next: ${nextLevel.name}`,
-        value: `${remaining} more wagered needed (${progress}% progress)`,
-        inline: false,
-      });
-    } else {
-      embed.addFields({ name: 'Status', value: 'Maximum VIP level reached!', inline: false });
-    }
-
-    return interaction.reply({ embeds: [embed] });
+    return interaction.reply({ embeds: [embed], files: [attachment] });
   }
 
   if (sub === 'cashback') {
@@ -69,8 +71,8 @@ async function execute(interaction) {
     const embed = new EmbedBuilder()
       .setTitle('VIP Cashback Claimed')
       .setDescription(`Received **${result.amount}** coins cashback (${(result.level.cashbackRate * 100).toFixed(1)}% rate)`)
-      .setColor(0x2ecc71)
-      .addFields({ name: 'New Balance', value: `${newBalance}`, inline: true })
+      .setColor(COLORS.win)
+      .addFields({ name: 'New Balance', value: `\`${newBalance.toLocaleString()}\``, inline: true })
       .setTimestamp();
 
     return interaction.reply({ embeds: [embed] });
@@ -84,7 +86,7 @@ async function execute(interaction) {
     const embed = new EmbedBuilder()
       .setTitle('VIP Levels')
       .setDescription(lines.join('\n\n'))
-      .setColor(0xe91e63)
+      .setColor(COLORS.vip)
       .setFooter({ text: 'Level up automatically by wagering more!' });
 
     return interaction.reply({ embeds: [embed] });

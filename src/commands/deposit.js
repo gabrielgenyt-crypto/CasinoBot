@@ -1,6 +1,8 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const { ensureWallet } = require('../utils/wallet');
 const { getOrCreateDepositAddress } = require('../utils/hdWallet');
+const { COLORS } = require('../utils/animations');
+const { renderDeposit } = require('../utils/cardRenderer');
 
 const SUPPORTED_CHAINS = ['ETH', 'BSC', 'SOL', 'MATIC'];
 
@@ -50,21 +52,21 @@ async function execute(interaction) {
     throw error;
   }
 
+  const pngBuffer = renderDeposit({
+    chain,
+    address: result.address,
+    tokens: TOKEN_INFO[chain],
+    confirmations: CONFIRMATIONS[chain],
+  });
+  const attachment = new AttachmentBuilder(pngBuffer, { name: 'deposit.png' });
+
   const embed = new EmbedBuilder()
     .setTitle(`Deposit — ${chain}`)
-    .setDescription(
-      `Send **${chain}** tokens to your unique address below.\n` +
-      `Balance credited after **${CONFIRMATIONS[chain]}** confirmations.\n\n` +
-      `**\`${result.address}\`**`
-    )
-    .setColor(result.isNew ? 0x2ecc71 : 0x3498db)
-    .addFields(
-      { name: 'Supported Tokens', value: TOKEN_INFO[chain], inline: true },
-      { name: 'Confirmations', value: `${CONFIRMATIONS[chain]}`, inline: true }
-    )
-    .setFooter({ text: 'Only send supported tokens to this address. Other tokens may be lost.' });
+    .setColor(COLORS.info)
+    .setImage('attachment://deposit.png')
+    .setTimestamp();
 
-  return interaction.reply({ embeds: [embed], ephemeral: true });
+  return interaction.reply({ embeds: [embed], files: [attachment], ephemeral: true });
 }
 
 module.exports = { data, execute };

@@ -1,6 +1,8 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const db = require('../utils/database');
 const { getBalance, ensureWallet } = require('../utils/wallet');
+const { COLORS } = require('../utils/animations');
+const { renderStats } = require('../utils/cardRenderer');
 
 const data = new SlashCommandBuilder()
   .setName('stats')
@@ -31,7 +33,6 @@ async function execute(interaction) {
   const losses = overall.games - overall.wins;
   const netProfit = (overall.earned || 0) - (overall.wagered || 0);
   const winRate = ((overall.wins / overall.games) * 100).toFixed(1);
-  const profitSign = netProfit >= 0 ? '+' : '';
 
   // Per-game breakdown.
   const perGame = db
@@ -40,52 +41,46 @@ async function execute(interaction) {
     )
     .all(userId);
 
-  const gameLines = perGame.map((g) => {
-    const gProfit = (g.earned || 0) - (g.wagered || 0);
-    const gSign = gProfit >= 0 ? '+' : '';
-    const gWinRate = ((g.wins / g.games) * 100).toFixed(0);
-    return `**${g.game}** — ${g.games} games | ${g.wins}W/${g.games - g.wins}L (${gWinRate}%) | ${gSign}${gProfit}`;
-  });
+  const perGameData = perGame.map((g) => ({
+    game: g.game,
+    games: g.games,
+    wins: g.wins,
+    profit: (g.earned || 0) - (g.wagered || 0),
+  }));
 
   // Biggest win.
   const bigWin = db
     .prepare(
-      'SELECT game, bet, payout, created_at FROM game_history WHERE user_id = ? AND won = 1 ORDER BY (payout - bet) DESC LIMIT 1'
+      'SELECT game, bet, payout FROM game_history WHERE user_id = ? AND won = 1 ORDER BY (payout - bet) DESC LIMIT 1'
     )
     .get(userId);
 
+  const biggestWin = bigWin
+    ? { game: bigWin.game, profit: bigWin.payout - bigWin.bet }
+    : null;
+
+  // Render the stats card PNG.
+  const pngBuffer = renderStats({
+    playerName: target.username,
+    balance: getBalance(userId),
+    gamesPlayed: overall.games,
+    wins: overall.wins,
+    losses,
+    winRate,
+    totalWagered: overall.wagered || 0,
+    netProfit,
+    perGame: perGameData,
+    biggestWin,
+  });
+  const attachment = new AttachmentBuilder(pngBuffer, { name: 'stats.png' });
+
   const embed = new EmbedBuilder()
     .setTitle(`Stats — ${target.username}`)
-    .setColor(0x3498db)
-    .addFields(
-      { name: 'Balance', value: `${getBalance(userId)}`, inline: true },
-      { name: 'Games Played', value: `${overall.games}`, inline: true },
-      { name: 'Win Rate', value: `${winRate}%`, inline: true },
-      { name: 'Wins / Losses', value: `${overall.wins}W / ${losses}L`, inline: true },
-      { name: 'Total Wagered', value: `${overall.wagered || 0}`, inline: true },
-      { name: 'Net Profit', value: `${profitSign}${netProfit}`, inline: true }
-    );
+    .setColor(COLORS.info)
+    .setImage('attachment://stats.png')
+    .setTimestamp();
 
-  if (gameLines.length > 0) {
-    embed.addFields({
-      name: 'Per-Game Breakdown',
-      value: gameLines.join('\n'),
-      inline: false,
-    });
-  }
-
-  if (bigWin) {
-    const bigProfit = bigWin.payout - bigWin.bet;
-    embed.addFields({
-      name: 'Biggest Win',
-      value: `**${bigWin.game}** — Bet ${bigWin.bet}, Won ${bigWin.payout} (+${bigProfit}) on ${bigWin.created_at}`,
-      inline: false,
-    });
-  }
-
-  embed.setTimestamp();
-
-  return interaction.reply({ embeds: [embed] });
+  return interaction.reply({ embeds: [embed], files: [attachment] });
 }
 
 module.exports = { data, execute };
