@@ -137,7 +137,7 @@ function buildEmbed(interaction, state, _showDealer = false) {
       { name: `${EMOJIS.coin} Balance`, value: `\`${state.newBalance.toLocaleString()}\``, inline: true },
       { name: `${EMOJIS.blackjack} Bet`, value: `\`${state.bet.toLocaleString()}\``, inline: true }
     );
-    embed.setFooter({ text: `${EMOJIS.shield} Provably Fair | /fairness to verify` });
+    embed.setFooter({ text: `${EMOJIS.shield} Provably Fair | /fairness` });
 
     if (state.vipLevelUp) {
       embed.addFields({

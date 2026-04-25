@@ -124,7 +124,7 @@ const runChecks = (userId, command) => {
     if (exclusion.permanent) {
       return 'You have permanently self-excluded from the casino.';
     }
-    return `You are self-excluded until ${exclusion.until}. Use /exclude to manage.`;
+    return `You are self-excluded until ${exclusion.until}. Contact an admin to manage.`;
   }
 
   const rateLimit = checkRateLimit(userId, command);

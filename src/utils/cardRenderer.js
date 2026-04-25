@@ -929,6 +929,993 @@ function renderRussianRoulette({ players, winnerUsername, pot }) {
   return canvas.toBuffer('image/png');
 }
 
+// ─── Shared Gradient & Glow Helpers ─────────────────────────────────────────
+
+/**
+ * Fills a rounded rectangle with a vertical gradient.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} x
+ * @param {number} y
+ * @param {number} w
+ * @param {number} h
+ * @param {number} r - Corner radius.
+ * @param {string} colorTop - Top gradient color.
+ * @param {string} colorBottom - Bottom gradient color.
+ */
+function gradientRect(ctx, x, y, w, h, r, colorTop, colorBottom) {
+  const grad = ctx.createLinearGradient(x, y, x, y + h);
+  grad.addColorStop(0, colorTop);
+  grad.addColorStop(1, colorBottom);
+  roundRect(ctx, x, y, w, h, r);
+  ctx.fillStyle = grad;
+  ctx.fill();
+}
+
+/**
+ * Draws a glowing circle (radial gradient fading to transparent).
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} cx
+ * @param {number} cy
+ * @param {number} radius
+ * @param {string} color - Core glow color (hex).
+ */
+function glowCircle(ctx, cx, cy, radius, color) {
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+  grad.addColorStop(0, color);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/**
+ * Draws a horizontal separator line with a subtle glow.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} x
+ * @param {number} y
+ * @param {number} w
+ * @param {string} color
+ */
+function glowLine(ctx, x, y, w, color) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.4;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + w, y);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+// ─── Balance / Wallet Card Renderer ─────────────────────────────────────────
+
+const WALLET_W = 480;
+const WALLET_H = 260;
+
+/**
+ * Renders a wallet/balance card as a PNG buffer.
+ *
+ * @param {object} options
+ * @param {string} options.playerName - Display name.
+ * @param {number} options.balance - Current coin balance.
+ * @param {string} options.tier - Tier label (WHALE, HIGH ROLLER, etc.).
+ * @param {number} options.gamesPlayed - Total games played.
+ * @param {number} options.wins - Total wins.
+ * @param {string} options.winRate - Win rate string (e.g. "52.3").
+ * @param {string} options.vipName - VIP level name.
+ * @param {number} options.vipLevel - VIP tier number.
+ * @returns {Buffer} PNG image buffer.
+ */
+function renderBalance({
+  playerName = 'Player',
+  balance = 0,
+  tier = 'ROOKIE',
+  gamesPlayed = 0,
+  wins = 0,
+  winRate = '0.0',
+  vipName = 'None',
+  vipLevel = 0,
+}) {
+  const canvas = createCanvas(WALLET_W, WALLET_H);
+  const ctx = canvas.getContext('2d');
+
+  // Background gradient.
+  gradientRect(ctx, 0, 0, WALLET_W, WALLET_H, 16, '#0f0c29', '#1a1a3e');
+
+  // Accent glow in top-right.
+  glowCircle(ctx, WALLET_W - 60, 50, 120, 'rgba(255, 215, 0, 0.08)');
+
+  // Border.
+  roundRect(ctx, 0, 0, WALLET_W, WALLET_H, 16);
+  ctx.strokeStyle = '#ffd700';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Player name.
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 18px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(playerName, 24, 20);
+
+  // Tier badge.
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 12px Arial, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(tier, WALLET_W - 24, 24);
+
+  // Separator.
+  glowLine(ctx, 24, 48, WALLET_W - 48, '#ffd700');
+
+  // Balance label.
+  ctx.fillStyle = '#888899';
+  ctx.font = '13px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('BALANCE', 24, 60);
+
+  // Balance value.
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 42px Arial, sans-serif';
+  ctx.fillText(balance.toLocaleString(), 24, 78);
+
+  // "COINS" label.
+  ctx.fillStyle = '#888899';
+  ctx.font = 'bold 14px Arial, sans-serif';
+  const balTextW = ctx.measureText(balance.toLocaleString()).width;
+  ctx.fillText('COINS', 24 + balTextW + 10, 100);
+
+  // Separator.
+  glowLine(ctx, 24, 135, WALLET_W - 48, '#333355');
+
+  // Stats row.
+  const statsY = 150;
+  const colW = (WALLET_W - 48) / 4;
+
+  const statItems = [
+    { label: 'GAMES', value: String(gamesPlayed) },
+    { label: 'WINS', value: String(wins) },
+    { label: 'WIN RATE', value: `${winRate}%` },
+    { label: 'VIP', value: `${vipName} (T${vipLevel})` },
+  ];
+
+  for (let i = 0; i < statItems.length; i++) {
+    const sx = 24 + i * colW;
+
+    ctx.fillStyle = '#666688';
+    ctx.font = '11px Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(statItems[i].label, sx, statsY);
+
+    ctx.fillStyle = '#e0e0e0';
+    ctx.font = 'bold 16px Arial, sans-serif';
+    ctx.fillText(statItems[i].value, sx, statsY + 16);
+  }
+
+  // Bottom accent bar.
+  const barY = WALLET_H - 30;
+  roundRect(ctx, 24, barY, WALLET_W - 48, 6, 3);
+  const barGrad = ctx.createLinearGradient(24, barY, WALLET_W - 24, barY);
+  barGrad.addColorStop(0, '#ffd700');
+  barGrad.addColorStop(0.5, '#ff6b35');
+  barGrad.addColorStop(1, '#ffd700');
+  ctx.fillStyle = barGrad;
+  ctx.fill();
+
+  return canvas.toBuffer('image/png');
+}
+
+// ─── Stats Card Renderer ────────────────────────────────────────────────────
+
+const STATS_W = 500;
+const STATS_H = 340;
+
+/**
+ * Renders a player stats card as a PNG buffer.
+ *
+ * @param {object} options
+ * @param {string} options.playerName - Display name.
+ * @param {number} options.balance - Current balance.
+ * @param {number} options.gamesPlayed - Total games.
+ * @param {number} options.wins - Total wins.
+ * @param {number} options.losses - Total losses.
+ * @param {string} options.winRate - Win rate string.
+ * @param {number} options.totalWagered - Total wagered.
+ * @param {number} options.netProfit - Net profit (can be negative).
+ * @param {Array<{game: string, games: number, wins: number, profit: number}>} options.perGame
+ * @param {{game: string, profit: number}|null} options.biggestWin
+ * @returns {Buffer} PNG image buffer.
+ */
+function renderStats({
+  playerName = 'Player',
+  balance = 0,
+  gamesPlayed = 0,
+  wins = 0,
+  losses = 0,
+  winRate = '0.0',
+  totalWagered = 0,
+  netProfit = 0,
+  perGame = [],
+  biggestWin = null,
+}) {
+  const rowCount = Math.min(perGame.length, 6);
+  const dynamicH = STATS_H + rowCount * 22;
+  const canvas = createCanvas(STATS_W, dynamicH);
+  const ctx = canvas.getContext('2d');
+
+  // Background.
+  gradientRect(ctx, 0, 0, STATS_W, dynamicH, 16, '#0d1117', '#161b22');
+
+  // Border.
+  roundRect(ctx, 0, 0, STATS_W, dynamicH, 16);
+  ctx.strokeStyle = '#3498db';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Glow.
+  glowCircle(ctx, 80, 40, 100, 'rgba(52, 152, 219, 0.06)');
+
+  // Title.
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 20px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(`${playerName}'s Stats`, 24, 18);
+
+  glowLine(ctx, 24, 48, STATS_W - 48, '#3498db');
+
+  // Top stats grid (2 rows x 3 cols).
+  const gridY = 60;
+  const gColW = (STATS_W - 48) / 3;
+  const topStats = [
+    { label: 'BALANCE', value: balance.toLocaleString(), color: '#ffd700' },
+    { label: 'GAMES', value: String(gamesPlayed), color: '#e0e0e0' },
+    { label: 'WIN RATE', value: `${winRate}%`, color: '#00ff88' },
+    { label: 'WINS / LOSSES', value: `${wins}W / ${losses}L`, color: '#e0e0e0' },
+    { label: 'WAGERED', value: totalWagered.toLocaleString(), color: '#e0e0e0' },
+    { label: 'NET PROFIT', value: `${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString()}`, color: netProfit >= 0 ? '#00ff88' : '#ff3366' },
+  ];
+
+  for (let i = 0; i < topStats.length; i++) {
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    const sx = 24 + col * gColW;
+    const sy = gridY + row * 48;
+
+    ctx.fillStyle = '#666688';
+    ctx.font = '11px Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(topStats[i].label, sx, sy);
+
+    ctx.fillStyle = topStats[i].color;
+    ctx.font = 'bold 18px Arial, sans-serif';
+    ctx.fillText(topStats[i].value, sx, sy + 16);
+  }
+
+  // Per-game breakdown.
+  let curY = gridY + 110;
+  glowLine(ctx, 24, curY, STATS_W - 48, '#333355');
+  curY += 12;
+
+  ctx.fillStyle = '#888899';
+  ctx.font = 'bold 13px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('GAME BREAKDOWN', 24, curY);
+  curY += 22;
+
+  for (let i = 0; i < rowCount; i++) {
+    const g = perGame[i];
+    const gProfit = g.profit;
+    const gSign = gProfit >= 0 ? '+' : '';
+    const gWinRate = ((g.wins / g.games) * 100).toFixed(0);
+
+    ctx.fillStyle = '#e0e0e0';
+    ctx.font = 'bold 13px Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(g.game.toUpperCase(), 24, curY);
+
+    ctx.fillStyle = '#888899';
+    ctx.font = '12px Arial, sans-serif';
+    ctx.fillText(`${g.games} games  ${g.wins}W  ${gWinRate}%`, 140, curY);
+
+    ctx.fillStyle = gProfit >= 0 ? '#00ff88' : '#ff3366';
+    ctx.font = 'bold 13px Arial, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${gSign}${gProfit.toLocaleString()}`, STATS_W - 24, curY);
+
+    curY += 22;
+  }
+
+  // Biggest win.
+  if (biggestWin) {
+    curY += 6;
+    glowLine(ctx, 24, curY, STATS_W - 48, '#333355');
+    curY += 14;
+
+    ctx.fillStyle = '#ffd700';
+    ctx.font = 'bold 13px Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`BIGGEST WIN: ${biggestWin.game.toUpperCase()} +${biggestWin.profit.toLocaleString()}`, 24, curY);
+  }
+
+  return canvas.toBuffer('image/png');
+}
+
+// ─── Leaderboard Renderer ───────────────────────────────────────────────────
+
+const LB_W = 480;
+const LB_ROW_H = 32;
+const LB_HEADER_H = 70;
+const LB_PAD = 20;
+
+/**
+ * Renders a leaderboard as a PNG buffer.
+ *
+ * @param {object} options
+ * @param {string} options.title - Leaderboard title.
+ * @param {Array<{rank: number, name: string, value: string}>} options.rows - Up to 10 rows.
+ * @returns {Buffer} PNG image buffer.
+ */
+function renderLeaderboard({ title = 'Leaderboard', rows = [] }) {
+  const count = Math.min(rows.length, 10);
+  const canvasH = LB_HEADER_H + count * LB_ROW_H + LB_PAD * 2;
+  const canvas = createCanvas(LB_W, canvasH);
+  const ctx = canvas.getContext('2d');
+
+  // Background.
+  gradientRect(ctx, 0, 0, LB_W, canvasH, 16, '#1a0a2e', '#0d1117');
+
+  // Border.
+  roundRect(ctx, 0, 0, LB_W, canvasH, 16);
+  ctx.strokeStyle = '#ffd700';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Glow.
+  glowCircle(ctx, LB_W / 2, 30, 140, 'rgba(255, 215, 0, 0.06)');
+
+  // Title.
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 22px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(title, LB_W / 2, 18);
+
+  glowLine(ctx, 24, 52, LB_W - 48, '#ffd700');
+
+  // Rows.
+  const medalColors = ['#ffd700', '#c0c0c0', '#cd7f32'];
+  let curY = LB_HEADER_H;
+
+  for (let i = 0; i < count; i++) {
+    const row = rows[i];
+
+    // Highlight top 3 rows.
+    if (i < 3) {
+      roundRect(ctx, 16, curY - 2, LB_W - 32, LB_ROW_H - 2, 6);
+      ctx.fillStyle = `rgba(255, 215, 0, ${0.08 - i * 0.02})`;
+      ctx.fill();
+    }
+
+    // Rank.
+    ctx.fillStyle = i < 3 ? medalColors[i] : '#666688';
+    ctx.font = 'bold 14px Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`#${row.rank}`, 28, curY + 6);
+
+    // Name.
+    ctx.fillStyle = i < 3 ? '#ffffff' : '#cccccc';
+    ctx.font = i < 3 ? 'bold 14px Arial, sans-serif' : '14px Arial, sans-serif';
+    ctx.fillText(row.name, 70, curY + 6);
+
+    // Value.
+    ctx.fillStyle = i < 3 ? '#ffd700' : '#aaaacc';
+    ctx.font = 'bold 14px Arial, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(row.value, LB_W - 28, curY + 6);
+
+    curY += LB_ROW_H;
+  }
+
+  return canvas.toBuffer('image/png');
+}
+
+// ─── History Renderer ───────────────────────────────────────────────────────
+
+const HIST_W = 500;
+const HIST_ROW_H = 28;
+const HIST_HEADER_H = 60;
+
+/**
+ * Renders a game history card as a PNG buffer.
+ *
+ * @param {object} options
+ * @param {string} options.playerName - Display name.
+ * @param {Array<{game: string, bet: number, profit: number, won: boolean, date: string}>} options.games
+ * @returns {Buffer} PNG image buffer.
+ */
+function renderHistory({ playerName = 'Player', games = [] }) {
+  const count = Math.min(games.length, 15);
+  const canvasH = HIST_HEADER_H + count * HIST_ROW_H + 30;
+  const canvas = createCanvas(HIST_W, canvasH);
+  const ctx = canvas.getContext('2d');
+
+  // Background.
+  gradientRect(ctx, 0, 0, HIST_W, canvasH, 16, '#0d1117', '#1a1a2e');
+
+  // Border.
+  roundRect(ctx, 0, 0, HIST_W, canvasH, 16);
+  ctx.strokeStyle = '#9b59b6';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Title.
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 18px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(`${playerName}'s History`, 24, 16);
+
+  glowLine(ctx, 24, 44, HIST_W - 48, '#9b59b6');
+
+  // Column headers.
+  let curY = HIST_HEADER_H;
+  ctx.fillStyle = '#666688';
+  ctx.font = 'bold 11px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('#', 24, curY - 16);
+  ctx.fillText('GAME', 50, curY - 16);
+  ctx.fillText('BET', 180, curY - 16);
+  ctx.fillText('RESULT', 260, curY - 16);
+  ctx.textAlign = 'right';
+  ctx.fillText('DATE', HIST_W - 24, curY - 16);
+
+  // Rows.
+  for (let i = 0; i < count; i++) {
+    const g = games[i];
+    const sign = g.profit >= 0 ? '+' : '';
+
+    // Alternating row bg.
+    if (i % 2 === 0) {
+      roundRect(ctx, 16, curY - 2, HIST_W - 32, HIST_ROW_H - 2, 4);
+      ctx.fillStyle = 'rgba(255,255,255,0.02)';
+      ctx.fill();
+    }
+
+    // Row number.
+    ctx.fillStyle = '#555566';
+    ctx.font = '12px Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`${i + 1}`, 24, curY + 5);
+
+    // Game name.
+    ctx.fillStyle = '#cccccc';
+    ctx.font = '13px Arial, sans-serif';
+    ctx.fillText(g.game, 50, curY + 5);
+
+    // Bet.
+    ctx.fillStyle = '#aaaacc';
+    ctx.fillText(g.bet.toLocaleString(), 180, curY + 5);
+
+    // Result.
+    ctx.fillStyle = g.won ? '#00ff88' : '#ff3366';
+    ctx.font = 'bold 13px Arial, sans-serif';
+    ctx.fillText(`${sign}${g.profit.toLocaleString()}`, 260, curY + 5);
+
+    // Date.
+    ctx.fillStyle = '#555566';
+    ctx.font = '11px Arial, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(g.date, HIST_W - 24, curY + 6);
+
+    curY += HIST_ROW_H;
+  }
+
+  return canvas.toBuffer('image/png');
+}
+
+// ─── VIP Card Renderer ──────────────────────────────────────────────────────
+
+const VIP_W = 460;
+const VIP_H = 240;
+
+/**
+ * Renders a VIP status card as a PNG buffer.
+ *
+ * @param {object} options
+ * @param {string} options.playerName - Display name.
+ * @param {string} options.levelName - Current VIP level name.
+ * @param {number} options.levelNum - Current VIP tier number.
+ * @param {number} options.totalWagered - Total wagered amount.
+ * @param {string} options.cashbackRate - Cashback rate string (e.g. "2.5").
+ * @param {string|null} options.nextLevelName - Next level name or null if max.
+ * @param {number} options.progress - Progress to next level (0-1).
+ * @returns {Buffer} PNG image buffer.
+ */
+function renderVip({
+  playerName = 'Player',
+  levelName = 'None',
+  levelNum = 0,
+  totalWagered = 0,
+  cashbackRate = '0.0',
+  nextLevelName = null,
+  progress = 0,
+}) {
+  const canvas = createCanvas(VIP_W, VIP_H);
+  const ctx = canvas.getContext('2d');
+
+  // Background.
+  gradientRect(ctx, 0, 0, VIP_W, VIP_H, 16, '#1a0a2e', '#2d1b4e');
+
+  // Border.
+  roundRect(ctx, 0, 0, VIP_W, VIP_H, 16);
+  ctx.strokeStyle = '#e91e63';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Glow.
+  glowCircle(ctx, VIP_W - 80, 60, 120, 'rgba(233, 30, 99, 0.08)');
+
+  // Title.
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 18px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(`${playerName} - VIP Status`, 24, 18);
+
+  glowLine(ctx, 24, 46, VIP_W - 48, '#e91e63');
+
+  // Level badge.
+  const badgeX = 24;
+  const badgeY = 60;
+  roundRect(ctx, badgeX, badgeY, 160, 50, 10);
+  const badgeGrad = ctx.createLinearGradient(badgeX, badgeY, badgeX + 160, badgeY + 50);
+  badgeGrad.addColorStop(0, '#e91e63');
+  badgeGrad.addColorStop(1, '#9c27b0');
+  ctx.fillStyle = badgeGrad;
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 20px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(levelName, badgeX + 80, badgeY + 18);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.font = '12px Arial, sans-serif';
+  ctx.fillText(`Tier ${levelNum}`, badgeX + 80, badgeY + 38);
+
+  // Stats.
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  const infoX = 210;
+
+  ctx.fillStyle = '#666688';
+  ctx.font = '11px Arial, sans-serif';
+  ctx.fillText('TOTAL WAGERED', infoX, 62);
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.fillText(totalWagered.toLocaleString(), infoX, 78);
+
+  ctx.fillStyle = '#666688';
+  ctx.font = '11px Arial, sans-serif';
+  ctx.fillText('CASHBACK RATE', infoX + 160, 62);
+  ctx.fillStyle = '#00ff88';
+  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.fillText(`${cashbackRate}%`, infoX + 160, 78);
+
+  // Progress bar.
+  const barY = 135;
+  glowLine(ctx, 24, barY - 10, VIP_W - 48, '#333355');
+
+  if (nextLevelName) {
+    ctx.fillStyle = '#888899';
+    ctx.font = '12px Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Next: ${nextLevelName}`, 24, barY);
+
+    ctx.fillStyle = '#888899';
+    ctx.font = '12px Arial, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${(progress * 100).toFixed(1)}%`, VIP_W - 24, barY);
+
+    // Bar background.
+    const pbY = barY + 20;
+    roundRect(ctx, 24, pbY, VIP_W - 48, 14, 7);
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fill();
+
+    // Bar fill.
+    const fillW = Math.max((VIP_W - 48) * Math.min(progress, 1), 14);
+    roundRect(ctx, 24, pbY, fillW, 14, 7);
+    const pbGrad = ctx.createLinearGradient(24, pbY, 24 + fillW, pbY);
+    pbGrad.addColorStop(0, '#e91e63');
+    pbGrad.addColorStop(1, '#ff6b35');
+    ctx.fillStyle = pbGrad;
+    ctx.fill();
+  } else {
+    ctx.fillStyle = '#ffd700';
+    ctx.font = 'bold 16px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('MAX LEVEL REACHED', VIP_W / 2, barY + 10);
+  }
+
+  return canvas.toBuffer('image/png');
+}
+
+// ─── Tip Card Renderer ──────────────────────────────────────────────────────
+
+const TIP_W = 400;
+const TIP_H = 180;
+
+/**
+ * Renders a tip/transfer card as a PNG buffer.
+ *
+ * @param {object} options
+ * @param {string} options.senderName - Sender display name.
+ * @param {string} options.recipientName - Recipient display name.
+ * @param {number} options.amount - Amount tipped.
+ * @param {number} options.senderBalance - Sender's new balance.
+ * @param {number} options.recipientBalance - Recipient's new balance.
+ * @returns {Buffer} PNG image buffer.
+ */
+function renderTip({
+  senderName = 'Sender',
+  recipientName = 'Recipient',
+  amount = 0,
+  senderBalance = 0,
+  recipientBalance = 0,
+}) {
+  const canvas = createCanvas(TIP_W, TIP_H);
+  const ctx = canvas.getContext('2d');
+
+  // Background.
+  gradientRect(ctx, 0, 0, TIP_W, TIP_H, 16, '#0d1117', '#0a2a1a');
+
+  // Border.
+  roundRect(ctx, 0, 0, TIP_W, TIP_H, 16);
+  ctx.strokeStyle = '#2ecc71';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Title.
+  ctx.fillStyle = '#2ecc71';
+  ctx.font = 'bold 18px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText('COIN TRANSFER', TIP_W / 2, 16);
+
+  glowLine(ctx, 24, 42, TIP_W - 48, '#2ecc71');
+
+  // Transfer visual: sender -> amount -> recipient.
+  const midY = 75;
+
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(senderName, 80, midY);
+
+  // Arrow.
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 24px Arial, sans-serif';
+  ctx.fillText(`${amount.toLocaleString()}`, TIP_W / 2, midY - 4);
+  ctx.fillStyle = '#888899';
+  ctx.font = '12px Arial, sans-serif';
+  ctx.fillText('coins', TIP_W / 2, midY + 22);
+
+  // Arrow lines.
+  ctx.strokeStyle = '#ffd700';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(140, midY + 8);
+  ctx.lineTo(160, midY + 8);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(TIP_W - 160, midY + 8);
+  ctx.lineTo(TIP_W - 140, midY + 8);
+  ctx.stroke();
+
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.fillText(recipientName, TIP_W - 80, midY);
+
+  // Balances.
+  glowLine(ctx, 24, 120, TIP_W - 48, '#333355');
+
+  ctx.fillStyle = '#888899';
+  ctx.font = '11px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(`${senderName}: ${senderBalance.toLocaleString()}`, 24, 132);
+  ctx.textAlign = 'right';
+  ctx.fillText(`${recipientName}: ${recipientBalance.toLocaleString()}`, TIP_W - 24, 132);
+
+  return canvas.toBuffer('image/png');
+}
+
+// ─── Deposit Card Renderer ──────────────────────────────────────────────────
+
+const DEP_W = 440;
+const DEP_H = 200;
+
+/**
+ * Renders a deposit address card as a PNG buffer.
+ *
+ * @param {object} options
+ * @param {string} options.chain - Blockchain name (ETH, BSC, etc.).
+ * @param {string} options.address - Deposit address.
+ * @param {string} options.tokens - Supported tokens string.
+ * @param {number} options.confirmations - Required confirmations.
+ * @returns {Buffer} PNG image buffer.
+ */
+function renderDeposit({
+  chain = 'ETH',
+  address = '',
+  tokens = '',
+  confirmations = 12,
+}) {
+  const canvas = createCanvas(DEP_W, DEP_H);
+  const ctx = canvas.getContext('2d');
+
+  // Background.
+  gradientRect(ctx, 0, 0, DEP_W, DEP_H, 16, '#0d1117', '#0a1a2e');
+
+  // Border.
+  roundRect(ctx, 0, 0, DEP_W, DEP_H, 16);
+  ctx.strokeStyle = '#3498db';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Chain badge.
+  const badgeW = 80;
+  roundRect(ctx, 24, 16, badgeW, 28, 6);
+  ctx.fillStyle = '#3498db';
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(chain, 24 + badgeW / 2, 30);
+
+  // Title.
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('Deposit Address', 120, 20);
+
+  glowLine(ctx, 24, 52, DEP_W - 48, '#3498db');
+
+  // Address box.
+  roundRect(ctx, 24, 64, DEP_W - 48, 36, 8);
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fill();
+  ctx.strokeStyle = '#333355';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.fillStyle = '#00ff88';
+  ctx.font = '13px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  // Truncate address if too long.
+  const displayAddr = address.length > 46 ? address.substring(0, 22) + '...' + address.substring(address.length - 22) : address;
+  ctx.fillText(displayAddr, DEP_W / 2, 82);
+
+  // Info row.
+  const infoY = 118;
+  ctx.fillStyle = '#666688';
+  ctx.font = '11px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('SUPPORTED TOKENS', 24, infoY);
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.fillText(tokens, 24, infoY + 16);
+
+  ctx.fillStyle = '#666688';
+  ctx.font = '11px Arial, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('CONFIRMATIONS', DEP_W - 24, infoY);
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.fillText(String(confirmations), DEP_W - 24, infoY + 16);
+
+  // Warning.
+  ctx.fillStyle = '#ff9900';
+  ctx.font = '11px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Only send supported tokens. Other tokens may be lost.', DEP_W / 2, DEP_H - 22);
+
+  return canvas.toBuffer('image/png');
+}
+
+// ─── Withdraw Card Renderer ─────────────────────────────────────────────────
+
+const WD_W = 440;
+const WD_H = 220;
+
+/**
+ * Renders a withdrawal request card as a PNG buffer.
+ *
+ * @param {object} options
+ * @param {number} options.requestId - Request ID.
+ * @param {number} options.amount - Withdrawal amount.
+ * @param {string} options.chain - Blockchain.
+ * @param {string} options.address - Destination address.
+ * @param {string} options.status - Request status.
+ * @param {boolean} options.needsApproval - Whether admin approval is needed.
+ * @returns {Buffer} PNG image buffer.
+ */
+function renderWithdraw({
+  requestId = 0,
+  amount = 0,
+  chain = 'ETH',
+  address = '',
+  status = 'Pending',
+  needsApproval = false,
+}) {
+  const canvas = createCanvas(WD_W, WD_H);
+  const ctx = canvas.getContext('2d');
+
+  // Background.
+  gradientRect(ctx, 0, 0, WD_W, WD_H, 16, '#0d1117', '#1a0a0a');
+
+  // Border.
+  const borderColor = needsApproval ? '#f1c40f' : '#2ecc71';
+  roundRect(ctx, 0, 0, WD_W, WD_H, 16);
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Title.
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 18px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('Withdrawal Request', 24, 16);
+
+  // Request ID badge.
+  ctx.fillStyle = borderColor;
+  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(`#${requestId}`, WD_W - 24, 20);
+
+  glowLine(ctx, 24, 44, WD_W - 48, borderColor);
+
+  // Amount.
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 32px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(amount.toLocaleString(), WD_W / 2, 56);
+  ctx.fillStyle = '#888899';
+  ctx.font = '12px Arial, sans-serif';
+  ctx.fillText('COINS', WD_W / 2, 92);
+
+  // Address box.
+  roundRect(ctx, 24, 112, WD_W - 48, 30, 6);
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fill();
+
+  ctx.fillStyle = '#aaaacc';
+  ctx.font = '12px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const wdAddr = address.length > 46 ? address.substring(0, 22) + '...' + address.substring(address.length - 22) : address;
+  ctx.fillText(wdAddr, WD_W / 2, 127);
+
+  // Bottom info.
+  const btmY = 155;
+  ctx.fillStyle = '#666688';
+  ctx.font = '11px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('CHAIN', 24, btmY);
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.fillText(chain, 24, btmY + 16);
+
+  ctx.fillStyle = '#666688';
+  ctx.font = '11px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('STATUS', WD_W / 2, btmY);
+  ctx.fillStyle = needsApproval ? '#f1c40f' : '#2ecc71';
+  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.fillText(status, WD_W / 2, btmY + 16);
+
+  return canvas.toBuffer('image/png');
+}
+
+// ─── Daily / Weekly Reward Renderer ─────────────────────────────────────────
+
+const REWARD_W = 420;
+const REWARD_H = 200;
+
+/**
+ * Renders a daily/weekly reward card as a PNG buffer.
+ *
+ * @param {object} options
+ * @param {string} options.type - 'daily' or 'weekly'.
+ * @param {number} options.amount - Coins awarded.
+ * @param {number} options.streak - Current streak count.
+ * @param {number} options.newBalance - New balance after reward.
+ * @param {string} options.playerName - Display name.
+ * @returns {Buffer} PNG image buffer.
+ */
+function renderReward({
+  type = 'daily',
+  amount = 0,
+  streak = 1,
+  newBalance = 0,
+  playerName = 'Player',
+}) {
+  const canvas = createCanvas(REWARD_W, REWARD_H);
+  const ctx = canvas.getContext('2d');
+
+  const isWeekly = type === 'weekly';
+  const accentColor = isWeekly ? '#9b59b6' : '#2ecc71';
+
+  // Background.
+  gradientRect(ctx, 0, 0, REWARD_W, REWARD_H, 16,
+    isWeekly ? '#1a0a2e' : '#0a1a0a',
+    isWeekly ? '#0d0520' : '#0d1117'
+  );
+
+  // Border.
+  roundRect(ctx, 0, 0, REWARD_W, REWARD_H, 16);
+  ctx.strokeStyle = accentColor;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Glow.
+  glowCircle(ctx, REWARD_W / 2, 80, 100, `${accentColor}22`);
+
+  // Title.
+  ctx.fillStyle = accentColor;
+  ctx.font = 'bold 22px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(isWeekly ? 'WEEKLY CHEST' : 'DAILY REWARD', REWARD_W / 2, 16);
+
+  ctx.fillStyle = '#888899';
+  ctx.font = '12px Arial, sans-serif';
+  ctx.fillText(playerName, REWARD_W / 2, 42);
+
+  // Amount.
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 40px Arial, sans-serif';
+  ctx.fillText(`+${amount.toLocaleString()}`, REWARD_W / 2, 65);
+  ctx.fillStyle = '#888899';
+  ctx.font = '13px Arial, sans-serif';
+  ctx.fillText('COINS', REWARD_W / 2, 110);
+
+  // Streak and balance.
+  glowLine(ctx, 24, 132, REWARD_W - 48, '#333355');
+
+  ctx.fillStyle = '#666688';
+  ctx.font = '11px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('STREAK', 24, 142);
+  ctx.fillStyle = accentColor;
+  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.fillText(`${streak} ${isWeekly ? 'weeks' : 'days'}`, 24, 158);
+
+  ctx.fillStyle = '#666688';
+  ctx.font = '11px Arial, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('NEW BALANCE', REWARD_W - 24, 142);
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.fillText(newBalance.toLocaleString(), REWARD_W - 24, 158);
+
+  return canvas.toBuffer('image/png');
+}
+
 module.exports = {
   renderBlackjackTable,
   renderCoinflip,
@@ -937,4 +1924,13 @@ module.exports = {
   renderDice,
   renderRoulette,
   renderRussianRoulette,
+  renderBalance,
+  renderStats,
+  renderLeaderboard,
+  renderHistory,
+  renderVip,
+  renderTip,
+  renderDeposit,
+  renderWithdraw,
+  renderReward,
 };

@@ -1,5 +1,7 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const { getBalance, updateBalance, ensureWallet } = require('../utils/wallet');
+const { COLORS } = require('../utils/animations');
+const { renderTip } = require('../utils/cardRenderer');
 
 const data = new SlashCommandBuilder()
   .setName('tip')
@@ -30,7 +32,7 @@ async function execute(interaction) {
   const balance = getBalance(senderId);
   if (amount > balance) {
     return interaction.reply({
-      content: `Insufficient funds. Your balance: **${balance}**`,
+      content: `Insufficient funds. Your balance: **${balance.toLocaleString()}**`,
       ephemeral: true,
     });
   }
@@ -45,19 +47,25 @@ async function execute(interaction) {
     throw error;
   }
 
+  const senderBalance = getBalance(senderId);
+  const recipientBalance = getBalance(recipient.id);
+
+  const pngBuffer = renderTip({
+    senderName: interaction.user.username,
+    recipientName: recipient.username,
+    amount,
+    senderBalance,
+    recipientBalance,
+  });
+  const attachment = new AttachmentBuilder(pngBuffer, { name: 'tip.png' });
+
   const embed = new EmbedBuilder()
-    .setTitle('Tip Sent')
-    .setDescription(
-      `**${interaction.user.username}** tipped **${amount}** coins to **${recipient.username}**`
-    )
-    .setColor(0x2ecc71)
-    .addFields(
-      { name: 'Your Balance', value: `${getBalance(senderId)}`, inline: true },
-      { name: `${recipient.username}'s Balance`, value: `${getBalance(recipient.id)}`, inline: true }
-    )
+    .setTitle('Coin Transfer')
+    .setColor(COLORS.win)
+    .setImage('attachment://tip.png')
     .setTimestamp();
 
-  return interaction.reply({ embeds: [embed] });
+  return interaction.reply({ embeds: [embed], files: [attachment] });
 }
 
 module.exports = { data, execute };

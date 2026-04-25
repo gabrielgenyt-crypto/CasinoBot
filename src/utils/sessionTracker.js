@@ -71,7 +71,7 @@ const trackSession = (userId, bet, payout) => {
     return (
       `You have been playing for **${hours}h ${mins}m**. ` +
       `Total wagered this session: **${newWagered}** coins. ` +
-      'Consider taking a break. Use `/exclude` if you need to step away.'
+      'Consider taking a break.'
     );
   }
 
@@ -80,7 +80,7 @@ const trackSession = (userId, bet, payout) => {
     db.prepare('UPDATE session_tracking SET last_warning = ? WHERE user_id = ?').run(nowIso, userId);
     return (
       `You have lost **${newLost}** coins this session. ` +
-      'Please gamble responsibly. Use `/exclude` to set limits on your play.'
+      'Please gamble responsibly.'
     );
   }
 

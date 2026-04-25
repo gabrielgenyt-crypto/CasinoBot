@@ -1,5 +1,7 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const db = require('../utils/database');
+const { COLORS } = require('../utils/animations');
+const { renderHistory } = require('../utils/cardRenderer');
 
 const data = new SlashCommandBuilder()
   .setName('history')
@@ -7,10 +9,10 @@ const data = new SlashCommandBuilder()
   .addIntegerOption((opt) =>
     opt
       .setName('limit')
-      .setDescription('Number of games to show (default 10, max 25)')
+      .setDescription('Number of games to show (default 10, max 15)')
       .setRequired(false)
       .setMinValue(1)
-      .setMaxValue(25)
+      .setMaxValue(15)
   );
 
 async function execute(interaction) {
@@ -30,20 +32,28 @@ async function execute(interaction) {
     });
   }
 
-  const lines = rows.map((row, i) => {
-    const outcome = row.won ? '✅' : '❌';
-    const profit = row.payout - row.bet;
-    const sign = profit >= 0 ? '+' : '';
-    return `\`${i + 1}.\` ${outcome} **${row.game}** — Bet: ${row.bet} | ${sign}${profit} | ${row.created_at}`;
+  // Build data for the PNG renderer.
+  const games = rows.map((row) => ({
+    game: row.game,
+    bet: row.bet,
+    profit: row.payout - row.bet,
+    won: !!row.won,
+    date: row.created_at ? row.created_at.split(' ')[0] : '',
+  }));
+
+  const pngBuffer = renderHistory({
+    playerName: interaction.user.username,
+    games,
   });
+  const attachment = new AttachmentBuilder(pngBuffer, { name: 'history.png' });
 
   const embed = new EmbedBuilder()
     .setTitle(`Game History — ${interaction.user.username}`)
-    .setDescription(lines.join('\n'))
-    .setColor(0x9b59b6)
+    .setColor(COLORS.vip)
+    .setImage('attachment://history.png')
     .setFooter({ text: `Showing last ${rows.length} game(s)` });
 
-  return interaction.reply({ embeds: [embed], ephemeral: true });
+  return interaction.reply({ embeds: [embed], files: [attachment], ephemeral: true });
 }
 
 module.exports = { data, execute };

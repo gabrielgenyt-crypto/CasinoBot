@@ -1,13 +1,14 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const { getBalance, ensureWallet } = require('../utils/wallet');
 const db = require('../utils/database');
-const { COLORS, DIVIDER, progressBar } = require('../utils/animations');
-const { getVipRecord, getLevelForWagered, VIP_LEVELS } = require('../utils/vip');
+const { COLORS } = require('../utils/animations');
+const { getVipRecord, getLevelForWagered } = require('../utils/vip');
 const EMOJIS = require('../utils/emojis');
+const { renderBalance } = require('../utils/cardRenderer');
 
 const data = new SlashCommandBuilder()
   .setName('balance')
-  .setDescription('💰 Check your current coin balance and wallet overview.');
+  .setDescription('Check your current coin balance and wallet overview.');
 
 async function execute(interaction) {
   const userId = interaction.user.id;
@@ -29,63 +30,47 @@ async function execute(interaction) {
   // VIP info.
   const vipRecord = getVipRecord(userId);
   const vipLevel = getLevelForWagered(vipRecord.total_wagered);
-  const nextLevel = VIP_LEVELS[vipLevel.level + 1];
 
-  // Balance tier visual.
+  // Balance tier.
   let tier;
-  let tierEmoji;
   if (balance >= 100000) {
     tier = 'WHALE';
-    tierEmoji = EMOJIS.whale;
   } else if (balance >= 50000) {
     tier = 'HIGH ROLLER';
-    tierEmoji = EMOJIS.diamond;
   } else if (balance >= 10000) {
     tier = 'BALLER';
-    tierEmoji = EMOJIS.fire;
   } else if (balance >= 1000) {
     tier = 'PLAYER';
-    tierEmoji = EMOJIS.casino;
   } else {
     tier = 'ROOKIE';
-    tierEmoji = '🌱';
   }
 
-  let vipProgress = '';
-  if (nextLevel) {
-    vipProgress =
-      `\n**Next:** ${nextLevel.name} (${progressBar(vipRecord.total_wagered, nextLevel.threshold, 12)})`;
-  } else {
-    vipProgress = '\n**MAX LEVEL** ⭐';
-  }
+  // Render the wallet card PNG.
+  const pngBuffer = renderBalance({
+    playerName: interaction.user.username,
+    balance,
+    tier,
+    gamesPlayed,
+    wins,
+    winRate,
+    vipName: vipLevel.name,
+    vipLevel: vipLevel.level,
+  });
+  const attachment = new AttachmentBuilder(pngBuffer, { name: 'balance.png' });
 
   const embed = new EmbedBuilder()
-    .setTitle(`${tierEmoji}  ${interaction.user.username}'s Wallet  ${tierEmoji}`)
-    .setDescription(
-      `${DIVIDER}\n\n` +
-      '```\n' +
-      `  ${EMOJIS.coin} ${balance.toLocaleString()} COINS\n` +
-      '```\n' +
-      `**Rank:** ${tierEmoji} ${tier}\n` +
-      `**VIP:** ${vipLevel.name} (Tier ${vipLevel.level})${vipProgress}\n\n` +
-      DIVIDER
-    )
+    .setTitle(`${EMOJIS.coin}  ${interaction.user.username}'s Wallet`)
     .setColor(
       balance >= 50000 ? COLORS.jackpot
         : balance >= 10000 ? COLORS.win
           : balance >= 1000 ? COLORS.neutral
             : COLORS.info
     )
-    .addFields(
-      { name: '🎮 Games', value: `\`${gamesPlayed}\``, inline: true },
-      { name: `${EMOJIS.trophy} Wins`, value: `\`${wins}\``, inline: true },
-      { name: '📊 Win Rate', value: `\`${winRate}%\``, inline: true }
-    )
-    .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
-    .setFooter({ text: 'Use /stats for full stats' })
+    .setImage('attachment://balance.png')
+    .setFooter({ text: 'Use /stats for full stats | /daily for free coins' })
     .setTimestamp();
 
-  return interaction.reply({ embeds: [embed] });
+  return interaction.reply({ embeds: [embed], files: [attachment] });
 }
 
 module.exports = { data, execute };
