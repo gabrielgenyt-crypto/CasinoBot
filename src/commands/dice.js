@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const { getBalance, ensureWallet } = require('../utils/wallet');
 const { playDice } = require('../games/dice');
 const {
@@ -10,6 +10,7 @@ const {
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
+const { renderDice } = require('../utils/cardRenderer');
 
 // Dice face emojis for animation.
 const DICE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
@@ -164,6 +165,16 @@ async function execute(interaction) {
     ? `**${result.roll}** ${result.won ? '>' : '≤'} **${target}**`
     : `**${result.roll}** ${result.won ? '<' : '≥'} **${target}**`;
 
+  // Render the dice result image.
+  const pngBuffer = renderDice({
+    roll: result.roll,
+    target,
+    direction,
+    won: result.won,
+    playerName: interaction.user.username,
+  });
+  const attachment = new AttachmentBuilder(pngBuffer, { name: 'dice.png' });
+
   const finalEmbed = new EmbedBuilder()
     .setTitle(
       isBigWin
@@ -182,6 +193,7 @@ async function execute(interaction) {
       (isBigWin ? `\n${SPARKLE_LINE}` : '')
     )
     .setColor(color)
+    .setImage('attachment://dice.png')
     .addFields(
       { name: '🎯 Multiplier', value: `\`${result.multiplier}x\``, inline: true },
       { name: '📊 Win Chance', value: `\`${winChancePercent}%\``, inline: true },
@@ -200,7 +212,7 @@ async function execute(interaction) {
     });
   }
 
-  return msg.edit({ embeds: [finalEmbed] });
+  return msg.edit({ embeds: [finalEmbed], files: [attachment] });
 }
 
 module.exports = { data, execute };

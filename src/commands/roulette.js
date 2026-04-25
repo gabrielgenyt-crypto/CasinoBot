@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const { getBalance, ensureWallet } = require('../utils/wallet');
 const { playRoulette, BET_TYPES } = require('../games/roulette');
 const {
@@ -11,6 +11,7 @@ const {
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
+const { renderRoulette } = require('../utils/cardRenderer');
 
 // Build choices from BET_TYPES plus a few number examples.
 const betChoices = [
@@ -158,6 +159,15 @@ async function execute(interaction) {
     ? winBanner(result.payout, isBigWin)
     : lossBanner(bet);
 
+  // Render the roulette wheel image.
+  const pngBuffer = renderRoulette({
+    number: result.number,
+    color: result.color,
+    won: result.won,
+    playerName: interaction.user.username,
+  });
+  const attachment = new AttachmentBuilder(pngBuffer, { name: 'roulette.png' });
+
   const finalEmbed = new EmbedBuilder()
     .setTitle(
       isBigWin
@@ -175,6 +185,7 @@ async function execute(interaction) {
       (isBigWin ? `\n${SPARKLE_LINE}` : '')
     )
     .setColor(color)
+    .setImage('attachment://roulette.png')
     .addFields(
       { name: `${EMOJIS.coin} Balance`, value: `\`${result.newBalance.toLocaleString()}\``, inline: true },
       { name: '🔢 Nonce', value: `\`${result.nonce}\``, inline: true },
@@ -191,7 +202,7 @@ async function execute(interaction) {
     });
   }
 
-  return msg.edit({ embeds: [finalEmbed] });
+  return msg.edit({ embeds: [finalEmbed], files: [attachment] });
 }
 
 module.exports = { data, execute };
