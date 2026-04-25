@@ -4,6 +4,7 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  AttachmentBuilder,
 } = require('discord.js');
 const { getBalance, ensureWallet } = require('../utils/wallet');
 const {
@@ -20,6 +21,7 @@ const {
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
+const { renderBlackjackTable } = require('../utils/cardRenderer');
 
 // Active games keyed by userId.
 const activeGames = new Map();
@@ -32,23 +34,33 @@ const data = new SlashCommandBuilder()
   );
 
 /**
- * Formats a hand with fancy card boxes.
+ * Generates the card table PNG and wraps it in a Discord AttachmentBuilder.
+ * @param {object} state - The game state.
+ * @param {string} playerName - The player's display name.
+ * @param {boolean} showDealer - Whether to reveal all dealer cards.
+ * @returns {AttachmentBuilder}
  */
-function fancyHand(hand) {
-  return hand.map((c) => `\`[${c.display}]\``).join(' ');
+function buildCardImage(state, playerName, showDealer) {
+  const playerVal = handValue(state.playerHand);
+  const dealerVal = showDealer ? handValue(state.dealerHand) : '?';
+
+  const pngBuffer = renderBlackjackTable({
+    playerHand: state.playerHand,
+    dealerHand: state.dealerHand,
+    playerValue: playerVal,
+    dealerValue: dealerVal,
+    showDealer,
+    playerName,
+  });
+
+  return new AttachmentBuilder(pngBuffer, { name: 'blackjack.png' });
 }
 
 /**
  * Builds the game embed for the current state.
  */
-function buildEmbed(interaction, state, showDealer = false) {
+function buildEmbed(interaction, state, _showDealer = false) {
   const playerVal = handValue(state.playerHand);
-  const dealerCards = showDealer
-    ? fancyHand(state.dealerHand)
-    : `\`[${state.dealerHand[0].display}]\` \`[??]\``;
-  const dealerVal = showDealer
-    ? handValue(state.dealerHand)
-    : '?';
 
   let color;
   let title = `${EMOJIS.blackjack}  B L A C K J A C K  ${EMOJIS.blackjack}`;
@@ -81,20 +93,11 @@ function buildEmbed(interaction, state, showDealer = false) {
     color = COLORS.neutral;
   }
 
-  let description = `${DIVIDER}\n\n`;
-
-  // Dealer section.
-  description += `**Dealer** (${dealerVal})\n`;
-  description += `${dealerCards}\n\n`;
-
-  // Player section.
-  description += `**${interaction.user.username}** (${playerVal})`;
-  if (playerVal === 21 && !state.outcome) description += ' 🔥';
-  description += '\n';
-  description += `${fancyHand(state.playerHand)}\n\n`;
+  let description = `${DIVIDER}\n`;
 
   // Outcome section.
   if (state.outcome) {
+    description += '\n';
     switch (state.outcome) {
     case 'blackjack':
       description += `${SPARKLE_LINE}\n`;
@@ -118,13 +121,15 @@ function buildEmbed(interaction, state, showDealer = false) {
     }
     description += `\n${DIVIDER}`;
   } else {
-    description += DIVIDER;
+    if (playerVal === 21) description += ' 🔥';
+    description += `\n${DIVIDER}`;
   }
 
   const embed = new EmbedBuilder()
     .setTitle(title)
     .setDescription(description)
     .setColor(color)
+    .setImage('attachment://blackjack.png')
     .setTimestamp();
 
   if (state.outcome) {
@@ -211,8 +216,6 @@ async function execute(interaction) {
     .setDescription(
       `${DIVIDER}\n\n` +
       '🎴 Dealing cards...\n\n' +
-      '`[??]` `[??]`\n\n' +
-      '`[??]` `[??]`\n\n' +
       DIVIDER
     )
     .setColor(COLORS.pending);
@@ -220,10 +223,13 @@ async function execute(interaction) {
   const msg = await interaction.reply({ embeds: [dealingEmbed], fetchReply: true });
   await sleep(800);
 
+  const playerName = interaction.user.username;
+
   // If the game resolved immediately (natural blackjack), show final state.
   if (state.outcome) {
     const embed = buildEmbed(interaction, state, true);
-    return msg.edit({ embeds: [embed], components: [] });
+    const attachment = buildCardImage(state, playerName, true);
+    return msg.edit({ embeds: [embed], files: [attachment], components: [] });
   }
 
   activeGames.set(userId, state);
@@ -231,9 +237,10 @@ async function execute(interaction) {
   // Check if the user can afford to double.
   const canDouble = getBalance(userId) >= bet;
   const embed = buildEmbed(interaction, state);
+  const attachment = buildCardImage(state, playerName, false);
   const row = buildButtons(userId, canDouble);
 
-  return msg.edit({ embeds: [embed], components: [row] });
+  return msg.edit({ embeds: [embed], files: [attachment], components: [row] });
 }
 
 async function handleButton(interaction) {
@@ -276,20 +283,24 @@ async function handleButton(interaction) {
     throw error;
   }
 
+  const playerName = interaction.user.username;
+
   // If the game is resolved, clean up and show final state.
   if (updatedState.outcome) {
     activeGames.delete(ownerId);
     const embed = buildEmbed(interaction, updatedState, true);
-    return interaction.update({ embeds: [embed], components: [] });
+    const attachment = buildCardImage(updatedState, playerName, true);
+    return interaction.update({ embeds: [embed], files: [attachment], components: [] });
   }
 
   // Game continues -- update the embed with buttons.
   activeGames.set(ownerId, updatedState);
   const canDouble = getBalance(ownerId) >= updatedState.bet && updatedState.playerHand.length === 2;
   const embed = buildEmbed(interaction, updatedState);
+  const attachment = buildCardImage(updatedState, playerName, false);
   const row = buildButtons(ownerId, canDouble);
 
-  return interaction.update({ embeds: [embed], components: [row] });
+  return interaction.update({ embeds: [embed], files: [attachment], components: [row] });
 }
 
 module.exports = { data, execute, handleButton };
