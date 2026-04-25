@@ -3,11 +3,10 @@ const { getBalance, ensureWallet } = require('../utils/wallet');
 const { playCrash } = require('../games/crash');
 const {
   COLORS,
-  DIVIDER,
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
-const { renderCrash } = require('../utils/cardRenderer');
+const { renderCrash, renderCrashAnim } = require('../utils/cardRenderer');
 
 const data = new SlashCommandBuilder()
   .setName('crash')
@@ -23,21 +22,6 @@ const data = new SlashCommandBuilder()
       .setMinValue(1.01)
       .setMaxValue(1000)
   );
-
-/**
- * Builds a climbing multiplier bar for animation frames.
- * @param {number} current - Current multiplier.
- * @param {number} target - Target cashout.
- * @returns {string}
- */
-function rocketTrail(current, target) {
-  const maxBars = 15;
-  const ratio = Math.min(current / Math.max(target, 2), 1);
-  const filled = Math.round(ratio * maxBars);
-  const empty = maxBars - filled;
-  const bar = '▓'.repeat(filled) + '░'.repeat(empty);
-  return `\`${current.toFixed(2)}x\` ${bar} ${EMOJIS.rocket}`;
-}
 
 async function execute(interaction) {
   const userId = interaction.user.id;
@@ -65,57 +49,22 @@ async function execute(interaction) {
     throw error;
   }
 
-  // ── Build animation steps up to the crash/cashout point ──
-  // We simulate the multiplier climbing in steps.
-  const finalMultiplier = result.crashPoint;
-  const steps = [];
-  let m = 1.0;
-  const increment = Math.max((finalMultiplier - 1) / 4, 0.1);
+  // ── Animation frame: Launching PNG ──
+  const animBuffer = renderCrashAnim({
+    playerName: interaction.user.username,
+    cashout,
+  });
+  const animAttachment = new AttachmentBuilder(animBuffer, { name: 'launching.png' });
 
-  while (m < finalMultiplier - increment * 0.5) {
-    m += increment;
-    if (m < finalMultiplier) steps.push(parseFloat(m.toFixed(2)));
-  }
-  // Cap at 4 animation frames to keep it snappy.
-  const animSteps = steps.slice(0, 4);
-
-  // ── Frame 1: Launch ──
-  const launchEmbed = new EmbedBuilder()
+  const animEmbed = new EmbedBuilder()
     .setTitle(`${EMOJIS.rocket}  C R A S H  ${EMOJIS.rocket}`)
-    .setDescription(
-      `${DIVIDER}\n\n` +
-      '```\n' +
-      `  ${EMOJIS.rocket} LAUNCHING...\n` +
-      '  ▓░░░░░░░░░░░░░░\n' +
-      '  1.00x\n' +
-      '```\n' +
-      `**${interaction.user.username}** bet **${bet.toLocaleString()}** coins\n` +
-      `Target: **${cashout}x**\n\n` +
-      DIVIDER
-    )
-    .setColor(COLORS.pending);
+    .setColor(COLORS.pending)
+    .setImage('attachment://launching.png');
 
-  const msg = await interaction.reply({ embeds: [launchEmbed], fetchReply: true });
+  const msg = await interaction.reply({ embeds: [animEmbed], files: [animAttachment], fetchReply: true });
 
-  // ── Climbing frames ──
-  for (const step of animSteps) {
-    await sleep(600);
-    const climbColor = step >= cashout ? COLORS.win : COLORS.neutral;
-    const climbEmbed = new EmbedBuilder()
-      .setTitle(`${EMOJIS.rocket}  C R A S H  ${EMOJIS.rocket}`)
-      .setDescription(
-        `${DIVIDER}\n\n` +
-        `${rocketTrail(step, cashout)}\n\n` +
-        '📈 Multiplier climbing...\n' +
-        `Target: **${cashout}x**\n\n` +
-        DIVIDER
-      )
-      .setColor(climbColor);
-    await msg.edit({ embeds: [climbEmbed] });
-  }
-
-  // ── Final frame: Result ──
-  await sleep(800);
+  // ── Result after delay ──
+  await sleep(2000);
 
   const won = result.won;
   const color = won ? COLORS.win : COLORS.lose;

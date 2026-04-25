@@ -21,7 +21,7 @@ const {
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
-const { renderBlackjackTable } = require('../utils/cardRenderer');
+const { renderBlackjackTable, renderBlackjackAnim } = require('../utils/cardRenderer');
 
 // Active games keyed by userId.
 const activeGames = new Map();
@@ -216,29 +216,17 @@ async function execute(interaction) {
 
   const playerName = interaction.user.username;
 
-  // ── Multi-frame dealing animation ──
-  const dealFrames = [
-    '🎴 Shuffling the deck...',
-    '🃏 Dealing your first card...',
-    '🃏 Dealing dealer\'s card...',
-    '🃏 Dealing your second card...',
-    '🂠 Dealer takes a face-down card...',
-  ];
+  // ── Animation frame: Dealing PNG ──
+  const animBuffer = renderBlackjackAnim({ playerName });
+  const animAttachment = new AttachmentBuilder(animBuffer, { name: 'dealing.png' });
 
   const dealingEmbed = new EmbedBuilder()
     .setTitle(`${EMOJIS.blackjack}  B L A C K J A C K  ${EMOJIS.blackjack}`)
-    .setDescription(`${DIVIDER}\n\n${dealFrames[0]}\n\n${DIVIDER}`)
-    .setColor(COLORS.pending);
+    .setColor(COLORS.pending)
+    .setImage('attachment://dealing.png');
 
-  const msg = await interaction.reply({ embeds: [dealingEmbed], fetchReply: true });
-
-  // Animate through dealing frames.
-  for (let i = 1; i < dealFrames.length; i++) {
-    await sleep(500);
-    dealingEmbed.setDescription(`${DIVIDER}\n\n${dealFrames[i]}\n\n${DIVIDER}`);
-    await msg.edit({ embeds: [dealingEmbed] });
-  }
-  await sleep(400);
+  const msg = await interaction.reply({ embeds: [dealingEmbed], files: [animAttachment], fetchReply: true });
+  await sleep(1800);
 
   // If the game resolved immediately (natural blackjack), show final state.
   if (state.outcome) {

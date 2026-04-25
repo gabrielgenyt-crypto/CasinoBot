@@ -3,12 +3,10 @@ const { getBalance, ensureWallet } = require('../utils/wallet');
 const { playRoulette, BET_TYPES } = require('../games/roulette');
 const {
   COLORS,
-  DIVIDER,
-  rouletteWheel,
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
-const { renderRoulette } = require('../utils/cardRenderer');
+const { renderRoulette, renderRouletteAnim } = require('../utils/cardRenderer');
 
 // Build choices from BET_TYPES plus a few number examples.
 const betChoices = [
@@ -72,64 +70,22 @@ async function execute(interaction) {
     throw error;
   }
 
-  // ── Frame 1: Wheel starting to spin ──
-  const frame1 = new EmbedBuilder()
+  // ── Animation frame: Spinning PNG ──
+  const animBuffer = renderRouletteAnim({
+    playerName: interaction.user.username,
+    betLabel: result.betLabel,
+  });
+  const animAttachment = new AttachmentBuilder(animBuffer, { name: 'spinning.png' });
+
+  const animEmbed = new EmbedBuilder()
     .setTitle(`${EMOJIS.roulette}  R O U L E T T E  ${EMOJIS.roulette}`)
-    .setDescription(
-      `${DIVIDER}\n\n` +
-      `${rouletteWheel(0)}\n\n` +
-      '🔄 The wheel is spinning...\n' +
-      `**${interaction.user.username}** bet **${bet.toLocaleString()}** on **${result.betLabel}**\n\n` +
-      DIVIDER
-    )
-    .setColor(COLORS.pending);
+    .setColor(COLORS.pending)
+    .setImage('attachment://spinning.png');
 
-  const msg = await interaction.reply({ embeds: [frame1], fetchReply: true });
+  const msg = await interaction.reply({ embeds: [animEmbed], files: [animAttachment], fetchReply: true });
 
-  // ── Frame 2: Wheel spinning faster ──
-  await sleep(600);
-  const frame2 = new EmbedBuilder()
-    .setTitle(`${EMOJIS.roulette}  R O U L E T T E  ${EMOJIS.roulette}`)
-    .setDescription(
-      `${DIVIDER}\n\n` +
-      `${rouletteWheel(1)}\n\n` +
-      '🔄 Spinning faster...\n' +
-      `Bet: **${result.betLabel}**\n\n` +
-      DIVIDER
-    )
-    .setColor(COLORS.pending);
-  await msg.edit({ embeds: [frame2] });
-
-  // ── Frame 3: Ball bouncing ──
-  await sleep(600);
-  const frame3 = new EmbedBuilder()
-    .setTitle(`${EMOJIS.roulette}  R O U L E T T E  ${EMOJIS.roulette}`)
-    .setDescription(
-      `${DIVIDER}\n\n` +
-      `${rouletteWheel(2)}\n\n` +
-      '⚪ Ball is bouncing...\n' +
-      `Bet: **${result.betLabel}**\n\n` +
-      DIVIDER
-    )
-    .setColor(COLORS.pending);
-  await msg.edit({ embeds: [frame3] });
-
-  // ── Frame 4: Slowing down ──
-  await sleep(700);
-  const frame4 = new EmbedBuilder()
-    .setTitle(`${EMOJIS.roulette}  R O U L E T T E  ${EMOJIS.roulette}`)
-    .setDescription(
-      `${DIVIDER}\n\n` +
-      `${rouletteWheel(3)}\n\n` +
-      '⚪ Slowing down...\n' +
-      `Bet: **${result.betLabel}**\n\n` +
-      DIVIDER
-    )
-    .setColor(COLORS.pending);
-  await msg.edit({ embeds: [frame4] });
-
-  // ── Frame 5: Final result ──
-  await sleep(900);
+  // ── Result after delay ──
+  await sleep(2200);
 
   const colorEmoji = { red: '🔴', black: '⚫', green: '🟢' };
   const color = result.won ? COLORS.win : COLORS.lose;

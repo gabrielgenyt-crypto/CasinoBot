@@ -3,7 +3,7 @@ const { getBalance, ensureWallet } = require('../utils/wallet');
 const { playPlinko } = require('../games/plinko');
 const { COLORS, sleep } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
-const { renderPlinko } = require('../utils/cardRenderer');
+const { renderPlinko, renderPlinkoAnim } = require('../utils/cardRenderer');
 
 const data = new SlashCommandBuilder()
   .setName('plinko')
@@ -36,16 +36,19 @@ async function execute(interaction) {
     throw error;
   }
 
-  // ── Frame 1: Ball dropping ──
-  const frame1 = new EmbedBuilder()
+  // ── Animation frame: Dropping PNG ──
+  const animBuffer = renderPlinkoAnim({ playerName: interaction.user.username });
+  const animAttachment = new AttachmentBuilder(animBuffer, { name: 'dropping.png' });
+
+  const animEmbed = new EmbedBuilder()
     .setTitle('📍  P L I N K O  📍')
-    .setDescription('The ball is dropping...')
-    .setColor(COLORS.pending);
+    .setColor(COLORS.pending)
+    .setImage('attachment://dropping.png');
 
-  const msg = await interaction.reply({ embeds: [frame1], fetchReply: true });
+  const msg = await interaction.reply({ embeds: [animEmbed], files: [animAttachment], fetchReply: true });
 
-  // ── Frame 2: Result ──
-  await sleep(1200);
+  // ── Result after delay ──
+  await sleep(1500);
 
   const color = result.won ? COLORS.win : COLORS.lose;
 

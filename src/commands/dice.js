@@ -3,14 +3,10 @@ const { getBalance, ensureWallet } = require('../utils/wallet');
 const { playDice } = require('../games/dice');
 const {
   COLORS,
-  DIVIDER,
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
-const { renderDice } = require('../utils/cardRenderer');
-
-// Dice face emojis for animation.
-const DICE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+const { renderDice, renderDiceAnim } = require('../utils/cardRenderer');
 
 const data = new SlashCommandBuilder()
   .setName('dice')
@@ -73,54 +69,25 @@ async function execute(interaction) {
     throw error;
   }
 
-  const dirEmoji = direction === 'over' ? '📈' : '📉';
   const winChancePercent = (winChance * 100).toFixed(1);
 
-  // ── Frame 1: Rolling ──
-  const randFace = () => DICE_FACES[Math.floor(Math.random() * DICE_FACES.length)];
-  const frame1 = new EmbedBuilder()
+  // ── Animation frame: Rolling PNG ──
+  const animBuffer = renderDiceAnim({
+    playerName: interaction.user.username,
+    direction,
+    target,
+  });
+  const animAttachment = new AttachmentBuilder(animBuffer, { name: 'rolling.png' });
+
+  const animEmbed = new EmbedBuilder()
     .setTitle(`${EMOJIS.dice}  D I C E  ${EMOJIS.dice}`)
-    .setDescription(
-      `${DIVIDER}\n\n` +
-      `# ${randFace()}  ${randFace()}  ${randFace()}\n\n` +
-      '🔄 Rolling the dice...\n' +
-      `${dirEmoji} **${direction.toUpperCase()} ${target}**\n\n` +
-      DIVIDER
-    )
-    .setColor(COLORS.pending);
+    .setColor(COLORS.pending)
+    .setImage('attachment://rolling.png');
 
-  const msg = await interaction.reply({ embeds: [frame1], fetchReply: true });
+  const msg = await interaction.reply({ embeds: [animEmbed], files: [animAttachment], fetchReply: true });
 
-  // ── Frame 2: Still rolling ──
-  await sleep(600);
-  const frame2 = new EmbedBuilder()
-    .setTitle(`${EMOJIS.dice}  D I C E  ${EMOJIS.dice}`)
-    .setDescription(
-      `${DIVIDER}\n\n` +
-      `# ${randFace()}  ${randFace()}  ${randFace()}\n\n` +
-      '🔄 Bouncing...\n' +
-      `${dirEmoji} **${direction.toUpperCase()} ${target}**\n\n` +
-      DIVIDER
-    )
-    .setColor(COLORS.pending);
-  await msg.edit({ embeds: [frame2] });
-
-  // ── Frame 3: Slowing down ──
-  await sleep(600);
-  const frame3 = new EmbedBuilder()
-    .setTitle(`${EMOJIS.dice}  D I C E  ${EMOJIS.dice}`)
-    .setDescription(
-      `${DIVIDER}\n\n` +
-      `# ${randFace()}  ${randFace()}  ${randFace()}\n\n` +
-      '🎲 Settling...\n' +
-      `${dirEmoji} **${direction.toUpperCase()} ${target}**\n\n` +
-      DIVIDER
-    )
-    .setColor(COLORS.pending);
-  await msg.edit({ embeds: [frame3] });
-
-  // ── Frame 4: Result ──
-  await sleep(800);
+  // ── Result after delay ──
+  await sleep(1800);
 
   const color = result.won ? COLORS.win : COLORS.lose;
 
