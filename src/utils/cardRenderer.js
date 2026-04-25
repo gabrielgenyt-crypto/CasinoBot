@@ -282,13 +282,13 @@ function renderBlackjackTable({
 
 // ─── Coinflip Renderer ──────────────────────────────────────────────────────
 
-const COIN_RADIUS = 64;
-const COIN_BORDER = 6;
-const COIN_CANVAS_W = 320;
-const COIN_CANVAS_H = 220;
+const COIN_RADIUS = 72;
+const COIN_BORDER = 8;
+const COIN_CANVAS_W = 420;
+const COIN_CANVAS_H = 280;
 
 /**
- * Renders a coinflip result as a PNG buffer.
+ * Renders a coinflip result as a PNG buffer with neon glow effects.
  *
  * @param {object} options
  * @param {'heads'|'tails'} options.side - The side the coin landed on.
@@ -300,80 +300,106 @@ function renderCoinflip({ side, won, playerName = 'Player' }) {
   const canvas = createCanvas(COIN_CANVAS_W, COIN_CANVAS_H);
   const ctx = canvas.getContext('2d');
 
-  // Background.
-  roundRect(ctx, 0, 0, COIN_CANVAS_W, COIN_CANVAS_H, 12);
-  ctx.fillStyle = won ? '#1a4a2a' : '#4a1a1a';
-  ctx.fill();
-  ctx.strokeStyle = won ? '#2a7a3a' : '#7a2a2a';
-  ctx.lineWidth = 3;
+  // Dark gradient background.
+  gradientRect(ctx, 0, 0, COIN_CANVAS_W, COIN_CANVAS_H, 16,
+    won ? '#0a2a1a' : '#2a0a0a', '#0d1117');
+
+  // Border glow.
+  roundRect(ctx, 0, 0, COIN_CANVAS_W, COIN_CANVAS_H, 16);
+  ctx.strokeStyle = won ? '#00ff88' : '#ff3366';
+  ctx.lineWidth = 2;
   ctx.stroke();
 
   const cx = COIN_CANVAS_W / 2;
-  const cy = 100;
+  const cy = 130;
 
-  // Coin outer ring (gold).
+  // Outer neon glow ring.
+  const glowColor = won ? 'rgba(0, 255, 136, 0.15)' : 'rgba(255, 51, 102, 0.15)';
+  glowCircle(ctx, cx, cy, COIN_RADIUS + 40, glowColor);
+
+  // Coin shadow.
   ctx.beginPath();
-  ctx.arc(cx, cy, COIN_RADIUS + COIN_BORDER, 0, Math.PI * 2);
-  ctx.fillStyle = '#c9a800';
+  ctx.arc(cx + 3, cy + 4, COIN_RADIUS + COIN_BORDER, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
   ctx.fill();
 
-  // Coin inner circle.
+  // Coin outer ring (gold gradient).
+  ctx.beginPath();
+  ctx.arc(cx, cy, COIN_RADIUS + COIN_BORDER, 0, Math.PI * 2);
+  const outerGrad = ctx.createRadialGradient(cx - 20, cy - 20, 10, cx, cy, COIN_RADIUS + COIN_BORDER);
+  outerGrad.addColorStop(0, '#ffe066');
+  outerGrad.addColorStop(1, '#b8860b');
+  ctx.fillStyle = outerGrad;
+  ctx.fill();
+
+  // Coin inner circle (shiny gold).
   ctx.beginPath();
   ctx.arc(cx, cy, COIN_RADIUS, 0, Math.PI * 2);
-  ctx.fillStyle = '#ffd700';
+  const innerGrad = ctx.createRadialGradient(cx - 15, cy - 15, 5, cx, cy, COIN_RADIUS);
+  innerGrad.addColorStop(0, '#fff8dc');
+  innerGrad.addColorStop(0.4, '#ffd700');
+  innerGrad.addColorStop(1, '#daa520');
+  ctx.fillStyle = innerGrad;
   ctx.fill();
 
   // Inner ring detail.
   ctx.beginPath();
-  ctx.arc(cx, cy, COIN_RADIUS - 8, 0, Math.PI * 2);
-  ctx.strokeStyle = '#c9a800';
+  ctx.arc(cx, cy, COIN_RADIUS - 10, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(139, 105, 20, 0.6)';
   ctx.lineWidth = 2;
   ctx.stroke();
 
   // Side label on the coin.
-  ctx.fillStyle = '#8b6914';
-  ctx.font = 'bold 28px Arial, sans-serif';
+  ctx.fillStyle = '#6b4e0a';
+  ctx.font = 'bold 42px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(side === 'heads' ? 'H' : 'T', cx, cy);
 
   // Side text below the coin.
-  ctx.fillStyle = '#e0e0e0';
-  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.fillStyle = won ? '#00ff88' : '#ff3366';
+  ctx.font = 'bold 20px Arial, sans-serif';
   ctx.textBaseline = 'top';
-  ctx.fillText(side.toUpperCase(), cx, cy + COIN_RADIUS + COIN_BORDER + 8);
+  ctx.fillText(side.toUpperCase(), cx, cy + COIN_RADIUS + COIN_BORDER + 12);
 
   // Player label at the top.
-  ctx.fillStyle = LABEL_COLOR;
-  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 16px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(playerName, cx, 10);
+  ctx.fillText(playerName, cx, 14);
+
+  // Win/loss badge.
+  const badgeText = won ? 'WIN' : 'LOSS';
+  const badgeColor = won ? '#00ff88' : '#ff3366';
+  ctx.fillStyle = badgeColor;
+  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.fillText(badgeText, cx, 38);
 
   return canvas.toBuffer('image/png');
 }
 
 // ─── Slots Renderer ─────────────────────────────────────────────────────────
 
-const SLOT_REEL_SIZE = 80;
-const SLOT_GAP = 16;
-const SLOT_CANVAS_W = 360;
-const SLOT_CANVAS_H = 200;
+const SLOT_REEL_SIZE = 100;
+const SLOT_GAP = 20;
+const SLOT_CANVAS_W = 480;
+const SLOT_CANVAS_H = 280;
 
 // Plain-text fallback symbols for canvas rendering (Discord custom emojis
 // cannot be drawn on a server-side canvas).
 const SLOT_SYMBOL_MAP = {
-  diamond: { text: '\u2666', color: '#00bfff' },
-  seven: { text: '7', color: '#ff4444' },
-  bell: { text: '\u266A', color: '#ffd700' },
-  cherry: { text: '\u2764', color: '#ff3366' },
-  lemon: { text: 'L', color: '#ffee00' },
-  orange: { text: 'O', color: '#ff9900' },
-  grape: { text: 'G', color: '#9b59b6' },
+  diamond: { text: '\u2666', color: '#00e5ff', glow: 'rgba(0, 229, 255, 0.3)' },
+  seven: { text: '7', color: '#ff1744', glow: 'rgba(255, 23, 68, 0.3)' },
+  bell: { text: '\u266A', color: '#ffd700', glow: 'rgba(255, 215, 0, 0.3)' },
+  cherry: { text: '\u2764', color: '#ff3366', glow: 'rgba(255, 51, 102, 0.3)' },
+  lemon: { text: 'L', color: '#ffee00', glow: 'rgba(255, 238, 0, 0.3)' },
+  orange: { text: 'O', color: '#ff9100', glow: 'rgba(255, 145, 0, 0.3)' },
+  grape: { text: 'G', color: '#aa66cc', glow: 'rgba(170, 102, 204, 0.3)' },
 };
 
 /**
- * Renders a slot machine result as a PNG buffer.
+ * Renders a slot machine result as a PNG buffer with neon effects.
  *
  * @param {object} options
  * @param {Array<{emoji: string, name: string}>} options.reels - The 3 reel results.
@@ -386,58 +412,97 @@ function renderSlots({ reels, won, multiplier, playerName = 'Player' }) {
   const canvas = createCanvas(SLOT_CANVAS_W, SLOT_CANVAS_H);
   const ctx = canvas.getContext('2d');
 
-  // Background.
   const isJackpot = multiplier >= 10;
-  roundRect(ctx, 0, 0, SLOT_CANVAS_W, SLOT_CANVAS_H, 12);
-  ctx.fillStyle = isJackpot ? '#3a2a00' : won ? '#1a4a2a' : '#2a1a2a';
-  ctx.fill();
-  ctx.strokeStyle = isJackpot ? '#ffd700' : won ? '#2a7a3a' : '#5a2a5a';
-  ctx.lineWidth = 3;
+
+  // Dark gradient background.
+  const bgTop = isJackpot ? '#1a1400' : won ? '#0a1a10' : '#12081e';
+  const bgBot = '#0d1117';
+  gradientRect(ctx, 0, 0, SLOT_CANVAS_W, SLOT_CANVAS_H, 16, bgTop, bgBot);
+
+  // Neon border.
+  roundRect(ctx, 0, 0, SLOT_CANVAS_W, SLOT_CANVAS_H, 16);
+  ctx.strokeStyle = isJackpot ? '#ffd700' : won ? '#00ff88' : '#9b59b6';
+  ctx.lineWidth = 2;
   ctx.stroke();
 
+  // Ambient glow behind reels.
+  if (isJackpot) {
+    glowCircle(ctx, SLOT_CANVAS_W / 2, 120, 160, 'rgba(255, 215, 0, 0.08)');
+  }
+
   // Player label.
-  ctx.fillStyle = LABEL_COLOR;
-  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 16px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(playerName, SLOT_CANVAS_W / 2, 10);
+  ctx.fillText(playerName, SLOT_CANVAS_W / 2, 14);
+
+  // Machine frame.
+  const totalReelW = 3 * SLOT_REEL_SIZE + 2 * SLOT_GAP;
+  const frameX = (SLOT_CANVAS_W - totalReelW) / 2 - 16;
+  const frameY = 46;
+  const frameW = totalReelW + 32;
+  const frameH = SLOT_REEL_SIZE + 32;
+  roundRect(ctx, frameX, frameY, frameW, frameH, 12);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+  ctx.fill();
+  ctx.strokeStyle = isJackpot ? '#ffd700' : '#333355';
+  ctx.lineWidth = 2;
+  ctx.stroke();
 
   // Draw 3 reel boxes.
-  const totalReelW = 3 * SLOT_REEL_SIZE + 2 * SLOT_GAP;
   const startX = (SLOT_CANVAS_W - totalReelW) / 2;
-  const reelY = 40;
+  const reelY = 62;
 
   for (let i = 0; i < 3; i++) {
     const rx = startX + i * (SLOT_REEL_SIZE + SLOT_GAP);
+    const sym = SLOT_SYMBOL_MAP[reels[i].name] || { text: '?', color: '#ffffff', glow: 'rgba(255,255,255,0.2)' };
+
+    // Symbol glow behind reel.
+    if (won) {
+      glowCircle(ctx, rx + SLOT_REEL_SIZE / 2, reelY + SLOT_REEL_SIZE / 2, SLOT_REEL_SIZE / 2 + 10, sym.glow);
+    }
 
     // Reel background.
-    roundRect(ctx, rx, reelY, SLOT_REEL_SIZE, SLOT_REEL_SIZE, 8);
-    ctx.fillStyle = '#1a1a2e';
+    roundRect(ctx, rx, reelY, SLOT_REEL_SIZE, SLOT_REEL_SIZE, 10);
+    ctx.fillStyle = '#0d0d1a';
     ctx.fill();
-    ctx.strokeStyle = isJackpot ? '#ffd700' : '#444466';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = won ? sym.color : '#333355';
+    ctx.lineWidth = won ? 2.5 : 1.5;
     ctx.stroke();
 
     // Symbol.
-    const sym = SLOT_SYMBOL_MAP[reels[i].name] || { text: '?', color: '#ffffff' };
     ctx.fillStyle = sym.color;
-    ctx.font = 'bold 36px Arial, sans-serif';
+    ctx.font = 'bold 48px Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(sym.text, rx + SLOT_REEL_SIZE / 2, reelY + SLOT_REEL_SIZE / 2);
   }
 
+  // Win line across reels.
+  if (won) {
+    const lineY = reelY + SLOT_REEL_SIZE / 2;
+    ctx.strokeStyle = isJackpot ? '#ffd700' : '#00ff88';
+    ctx.lineWidth = 3;
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(startX - 8, lineY);
+    ctx.lineTo(startX + totalReelW + 8, lineY);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
   // Multiplier / result text.
-  const labelY = reelY + SLOT_REEL_SIZE + 20;
+  const labelY = frameY + frameH + 20;
   if (won) {
     ctx.fillStyle = isJackpot ? '#ffd700' : '#00ff88';
-    ctx.font = 'bold 22px Arial, sans-serif';
+    ctx.font = 'bold 32px Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.fillText(`${multiplier}x`, SLOT_CANVAS_W / 2, labelY);
   } else {
-    ctx.fillStyle = '#ff3366';
-    ctx.font = 'bold 18px Arial, sans-serif';
+    ctx.fillStyle = '#666688';
+    ctx.font = 'bold 20px Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.fillText('No match', SLOT_CANVAS_W / 2, labelY);
@@ -448,14 +513,14 @@ function renderSlots({ reels, won, multiplier, playerName = 'Player' }) {
 
 // ─── Crash Renderer ─────────────────────────────────────────────────────────
 
-const CRASH_CANVAS_W = 400;
-const CRASH_CANVAS_H = 220;
-const CRASH_GRAPH_PAD = 50;
-const CRASH_GRAPH_TOP = 40;
-const CRASH_GRAPH_BOTTOM = 180;
+const CRASH_CANVAS_W = 500;
+const CRASH_CANVAS_H = 300;
+const CRASH_GRAPH_PAD = 60;
+const CRASH_GRAPH_TOP = 50;
+const CRASH_GRAPH_BOTTOM = 240;
 
 /**
- * Renders a crash game result as a PNG buffer showing the multiplier graph.
+ * Renders a crash game result as a PNG buffer with a neon multiplier graph.
  *
  * @param {object} options
  * @param {number} options.crashPoint - The multiplier where the game crashed.
@@ -468,29 +533,30 @@ function renderCrash({ crashPoint, cashout, won, playerName = 'Player' }) {
   const canvas = createCanvas(CRASH_CANVAS_W, CRASH_CANVAS_H);
   const ctx = canvas.getContext('2d');
 
-  // Background.
-  roundRect(ctx, 0, 0, CRASH_CANVAS_W, CRASH_CANVAS_H, 12);
-  ctx.fillStyle = '#0d1117';
-  ctx.fill();
-  ctx.strokeStyle = won ? '#2a7a3a' : '#7a2a2a';
-  ctx.lineWidth = 3;
+  // Dark gradient background.
+  gradientRect(ctx, 0, 0, CRASH_CANVAS_W, CRASH_CANVAS_H, 16, '#0a0e14', '#0d1117');
+
+  // Neon border.
+  roundRect(ctx, 0, 0, CRASH_CANVAS_W, CRASH_CANVAS_H, 16);
+  ctx.strokeStyle = won ? '#00ff88' : '#ff3366';
+  ctx.lineWidth = 2;
   ctx.stroke();
 
   // Player label.
-  ctx.fillStyle = LABEL_COLOR;
-  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 16px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(playerName, CRASH_CANVAS_W / 2, 8);
+  ctx.fillText(playerName, CRASH_CANVAS_W / 2, 10);
 
   // Graph area.
   const graphLeft = CRASH_GRAPH_PAD;
-  const graphRight = CRASH_CANVAS_W - 20;
+  const graphRight = CRASH_CANVAS_W - 30;
   const graphW = graphRight - graphLeft;
   const graphH = CRASH_GRAPH_BOTTOM - CRASH_GRAPH_TOP;
 
   // Axis lines.
-  ctx.strokeStyle = '#333344';
+  ctx.strokeStyle = '#222233';
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(graphLeft, CRASH_GRAPH_TOP);
@@ -500,19 +566,19 @@ function renderCrash({ crashPoint, cashout, won, playerName = 'Player' }) {
 
   // Y-axis labels.
   const maxY = Math.max(crashPoint, cashout, 2);
-  const ySteps = 4;
-  ctx.fillStyle = '#666688';
-  ctx.font = '11px Arial, sans-serif';
+  const ySteps = 5;
+  ctx.fillStyle = '#555577';
+  ctx.font = '12px Arial, sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
   for (let i = 0; i <= ySteps; i++) {
     const val = 1 + (maxY - 1) * (i / ySteps);
     const y = CRASH_GRAPH_BOTTOM - (i / ySteps) * graphH;
-    ctx.fillText(`${val.toFixed(1)}x`, graphLeft - 6, y);
+    ctx.fillText(`${val.toFixed(1)}x`, graphLeft - 8, y);
 
     // Grid line.
     if (i > 0) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)';
       ctx.beginPath();
       ctx.moveTo(graphLeft, y);
       ctx.lineTo(graphRight, y);
@@ -520,8 +586,27 @@ function renderCrash({ crashPoint, cashout, won, playerName = 'Player' }) {
     }
   }
 
-  // Draw the multiplier curve.
-  const steps = 60;
+  // Gradient fill under the curve.
+  const curveColor = won ? '#00ff88' : '#ff3366';
+  const steps = 80;
+  ctx.beginPath();
+  ctx.moveTo(graphLeft, CRASH_GRAPH_BOTTOM);
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const m = 1 + t * (crashPoint - 1);
+    const x = graphLeft + t * graphW;
+    const y = CRASH_GRAPH_BOTTOM - ((m - 1) / (maxY - 1)) * graphH;
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(graphLeft + graphW, CRASH_GRAPH_BOTTOM);
+  ctx.closePath();
+  const fillGrad = ctx.createLinearGradient(0, CRASH_GRAPH_TOP, 0, CRASH_GRAPH_BOTTOM);
+  fillGrad.addColorStop(0, won ? 'rgba(0, 255, 136, 0.15)' : 'rgba(255, 51, 102, 0.15)');
+  fillGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = fillGrad;
+  ctx.fill();
+
+  // Draw the multiplier curve (neon line).
   ctx.beginPath();
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
@@ -531,41 +616,47 @@ function renderCrash({ crashPoint, cashout, won, playerName = 'Player' }) {
     if (i === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   }
-  ctx.strokeStyle = won ? '#00ff88' : '#ff3366';
-  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = curveColor;
+  ctx.lineWidth = 3;
   ctx.stroke();
 
-  // Crash / cashout marker.
+  // Crash / cashout marker with glow.
   const markerM = won ? cashout : crashPoint;
   const markerT = (markerM - 1) / (crashPoint - 1 || 1);
   const markerX = graphLeft + Math.min(markerT, 1) * graphW;
   const markerY = CRASH_GRAPH_BOTTOM - ((markerM - 1) / (maxY - 1)) * graphH;
 
+  // Marker glow.
+  glowCircle(ctx, markerX, markerY, 20, won ? 'rgba(0, 255, 136, 0.4)' : 'rgba(255, 51, 102, 0.4)');
+
   ctx.beginPath();
-  ctx.arc(markerX, markerY, 5, 0, Math.PI * 2);
-  ctx.fillStyle = won ? '#00ff88' : '#ff3366';
+  ctx.arc(markerX, markerY, 6, 0, Math.PI * 2);
+  ctx.fillStyle = curveColor;
   ctx.fill();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
 
   // Marker label.
-  ctx.fillStyle = won ? '#00ff88' : '#ff3366';
-  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.fillStyle = curveColor;
+  ctx.font = 'bold 16px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   ctx.fillText(
     won ? `${cashout}x` : `${crashPoint}x`,
     markerX,
-    markerY - 10
+    markerY - 14
   );
 
   // Result text at the bottom.
-  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.font = 'bold 18px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillStyle = won ? '#00ff88' : '#ff3366';
+  ctx.fillStyle = curveColor;
   ctx.fillText(
     won ? `Cashed out at ${cashout}x` : `Crashed at ${crashPoint}x`,
     CRASH_CANVAS_W / 2,
-    CRASH_GRAPH_BOTTOM + 8
+    CRASH_GRAPH_BOTTOM + 14
   );
 
   return canvas.toBuffer('image/png');
@@ -573,31 +664,40 @@ function renderCrash({ crashPoint, cashout, won, playerName = 'Player' }) {
 
 // ─── Dice Renderer ──────────────────────────────────────────────────────────
 
-const DICE_CANVAS_W = 380;
-const DICE_CANVAS_H = 200;
-const DIE_SIZE = 60;
+const DICE_CANVAS_W = 460;
+const DICE_CANVAS_H = 260;
+const DIE_SIZE = 72;
 
 /**
- * Draws a single die face with pips at the given position.
+ * Draws a single die face with pips and a neon glow.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} x - Top-left x.
  * @param {number} y - Top-left y.
  * @param {number} value - Die face value (1-6). Values > 6 show a dot.
+ * @param {string} glowColor - Glow color for the die border.
  */
-function drawDie(ctx, x, y, value) {
-  // Die body.
-  roundRect(ctx, x, y, DIE_SIZE, DIE_SIZE, 8);
-  ctx.fillStyle = '#ffffff';
+function drawDie(ctx, x, y, value, glowColor) {
+  // Shadow.
+  roundRect(ctx, x + 3, y + 3, DIE_SIZE, DIE_SIZE, 10);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
   ctx.fill();
-  ctx.strokeStyle = '#cccccc';
-  ctx.lineWidth = 1.5;
+
+  // Die body (dark with gradient).
+  roundRect(ctx, x, y, DIE_SIZE, DIE_SIZE, 10);
+  const dieGrad = ctx.createLinearGradient(x, y, x, y + DIE_SIZE);
+  dieGrad.addColorStop(0, '#2a2a3e');
+  dieGrad.addColorStop(1, '#1a1a2e');
+  ctx.fillStyle = dieGrad;
+  ctx.fill();
+  ctx.strokeStyle = glowColor || '#555577';
+  ctx.lineWidth = 2;
   ctx.stroke();
 
   // Pip positions (relative to die center).
   const cx = x + DIE_SIZE / 2;
   const cy = y + DIE_SIZE / 2;
-  const off = 14;
-  const pipR = 4;
+  const off = 16;
+  const pipR = 5;
 
   const pipPositions = {
     1: [[0, 0]],
@@ -608,7 +708,7 @@ function drawDie(ctx, x, y, value) {
     6: [[-off, -off], [off, -off], [-off, 0], [off, 0], [-off, off], [off, off]],
   };
 
-  ctx.fillStyle = '#1a1a1a';
+  ctx.fillStyle = '#e0e0e0';
   const pips = pipPositions[value] || [[0, 0]];
   for (const [dx, dy] of pips) {
     ctx.beginPath();
@@ -618,7 +718,7 @@ function drawDie(ctx, x, y, value) {
 }
 
 /**
- * Renders a dice game result as a PNG buffer showing the roll and slider.
+ * Renders a dice game result as a PNG buffer with neon slider.
  *
  * @param {object} options
  * @param {number} options.roll - The dice roll result (1-100).
@@ -632,89 +732,110 @@ function renderDice({ roll, target, direction, won, playerName = 'Player' }) {
   const canvas = createCanvas(DICE_CANVAS_W, DICE_CANVAS_H);
   const ctx = canvas.getContext('2d');
 
-  // Background.
-  roundRect(ctx, 0, 0, DICE_CANVAS_W, DICE_CANVAS_H, 12);
-  ctx.fillStyle = won ? '#1a3a2a' : '#3a1a1a';
-  ctx.fill();
-  ctx.strokeStyle = won ? '#2a7a3a' : '#7a2a2a';
-  ctx.lineWidth = 3;
+  // Dark gradient background.
+  gradientRect(ctx, 0, 0, DICE_CANVAS_W, DICE_CANVAS_H, 16,
+    won ? '#0a1a14' : '#1a0a0a', '#0d1117');
+
+  // Neon border.
+  roundRect(ctx, 0, 0, DICE_CANVAS_W, DICE_CANVAS_H, 16);
+  ctx.strokeStyle = won ? '#00ff88' : '#ff3366';
+  ctx.lineWidth = 2;
   ctx.stroke();
 
   // Player label.
-  ctx.fillStyle = LABEL_COLOR;
-  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 16px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(playerName, DICE_CANVAS_W / 2, 8);
+  ctx.fillText(playerName, DICE_CANVAS_W / 2, 12);
 
-  // Draw a die showing the roll (use last digit mapped to 1-6 for the face).
+  // Draw a die showing the roll.
   const dieFace = ((roll - 1) % 6) + 1;
-  drawDie(ctx, DICE_CANVAS_W / 2 - DIE_SIZE / 2, 30, dieFace);
+  const dieX = DICE_CANVAS_W / 2 - DIE_SIZE / 2;
+  const dieY = 40;
+  const dieGlowColor = won ? '#00ff88' : '#ff3366';
+
+  // Die glow.
+  glowCircle(ctx, dieX + DIE_SIZE / 2, dieY + DIE_SIZE / 2, DIE_SIZE / 2 + 15, won ? 'rgba(0,255,136,0.12)' : 'rgba(255,51,102,0.12)');
+
+  drawDie(ctx, dieX, dieY, dieFace, dieGlowColor);
 
   // Roll number below the die.
   ctx.fillStyle = won ? '#00ff88' : '#ff3366';
-  ctx.font = 'bold 28px Arial, sans-serif';
+  ctx.font = 'bold 36px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(String(roll), DICE_CANVAS_W / 2, 30 + DIE_SIZE + 8);
+  ctx.fillText(String(roll), DICE_CANVAS_W / 2, dieY + DIE_SIZE + 10);
 
   // Slider bar.
-  const sliderY = 140;
-  const sliderH = 12;
-  const sliderLeft = 30;
-  const sliderRight = DICE_CANVAS_W - 30;
+  const sliderY = 175;
+  const sliderH = 14;
+  const sliderLeft = 40;
+  const sliderRight = DICE_CANVAS_W - 40;
   const sliderW = sliderRight - sliderLeft;
 
   // Background bar.
   roundRect(ctx, sliderLeft, sliderY, sliderW, sliderH, sliderH / 2);
-  ctx.fillStyle = '#333344';
+  ctx.fillStyle = '#1a1a2e';
   ctx.fill();
+  ctx.strokeStyle = '#333355';
+  ctx.lineWidth = 1;
+  ctx.stroke();
 
-  // Win zone highlight.
+  // Win zone highlight with gradient.
   if (direction === 'over') {
     const zoneX = sliderLeft + (target / 100) * sliderW;
     roundRect(ctx, zoneX, sliderY, sliderRight - zoneX, sliderH, sliderH / 2);
-    ctx.fillStyle = 'rgba(0, 255, 136, 0.3)';
+    ctx.fillStyle = 'rgba(0, 255, 136, 0.2)';
     ctx.fill();
   } else {
     const zoneW = (target / 100) * sliderW;
     roundRect(ctx, sliderLeft, sliderY, zoneW, sliderH, sliderH / 2);
-    ctx.fillStyle = 'rgba(0, 255, 136, 0.3)';
+    ctx.fillStyle = 'rgba(0, 255, 136, 0.2)';
     ctx.fill();
   }
 
-  // Target marker.
+  // Target marker with glow.
   const targetX = sliderLeft + (target / 100) * sliderW;
+  glowCircle(ctx, targetX, sliderY + sliderH / 2, 12, 'rgba(255, 153, 0, 0.3)');
   ctx.fillStyle = '#ff9900';
   ctx.beginPath();
-  ctx.arc(targetX, sliderY + sliderH / 2, 6, 0, Math.PI * 2);
+  ctx.arc(targetX, sliderY + sliderH / 2, 7, 0, Math.PI * 2);
   ctx.fill();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
 
-  // Roll marker.
+  // Roll marker with glow.
   const rollX = sliderLeft + (roll / 100) * sliderW;
-  ctx.fillStyle = won ? '#00ff88' : '#ff3366';
+  const rollColor = won ? '#00ff88' : '#ff3366';
+  glowCircle(ctx, rollX, sliderY + sliderH / 2, 16, won ? 'rgba(0,255,136,0.3)' : 'rgba(255,51,102,0.3)');
+  ctx.fillStyle = rollColor;
   ctx.beginPath();
-  ctx.arc(rollX, sliderY + sliderH / 2, 8, 0, Math.PI * 2);
+  ctx.arc(rollX, sliderY + sliderH / 2, 9, 0, Math.PI * 2);
   ctx.fill();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
 
   // Labels below slider.
-  ctx.font = '11px Arial, sans-serif';
+  ctx.font = '12px Arial, sans-serif';
   ctx.textBaseline = 'top';
-  ctx.fillStyle = '#888888';
+  ctx.fillStyle = '#555577';
   ctx.textAlign = 'left';
-  ctx.fillText('1', sliderLeft, sliderY + sliderH + 4);
+  ctx.fillText('1', sliderLeft, sliderY + sliderH + 6);
   ctx.textAlign = 'right';
-  ctx.fillText('100', sliderRight, sliderY + sliderH + 4);
+  ctx.fillText('100', sliderRight, sliderY + sliderH + 6);
 
   // Direction label.
-  ctx.fillStyle = LABEL_COLOR;
-  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 16px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText(
     `${direction.toUpperCase()} ${target}`,
     DICE_CANVAS_W / 2,
-    sliderY + sliderH + 20
+    sliderY + sliderH + 24
   );
 
   return canvas.toBuffer('image/png');
@@ -722,18 +843,18 @@ function renderDice({ roll, target, direction, won, playerName = 'Player' }) {
 
 // ─── Roulette Renderer ──────────────────────────────────────────────────────
 
-const ROULETTE_CANVAS_W = 320;
-const ROULETTE_CANVAS_H = 240;
-const WHEEL_RADIUS = 80;
+const ROULETTE_CANVAS_W = 420;
+const ROULETTE_CANVAS_H = 320;
+const WHEEL_RADIUS = 100;
 
 const ROULETTE_COLORS = {
-  red: '#d32f2f',
-  black: '#1a1a1a',
+  red: '#e53935',
+  black: '#212121',
   green: '#2e7d32',
 };
 
 /**
- * Renders a roulette result as a PNG buffer showing the wheel and number.
+ * Renders a roulette result as a PNG buffer with a glowing wheel.
  *
  * @param {object} options
  * @param {number} options.number - The winning number (0-36).
@@ -746,34 +867,41 @@ function renderRoulette({ number, color, won, playerName = 'Player' }) {
   const canvas = createCanvas(ROULETTE_CANVAS_W, ROULETTE_CANVAS_H);
   const ctx = canvas.getContext('2d');
 
-  // Background.
-  roundRect(ctx, 0, 0, ROULETTE_CANVAS_W, ROULETTE_CANVAS_H, 12);
-  ctx.fillStyle = '#0a1a0a';
-  ctx.fill();
-  ctx.strokeStyle = won ? '#2a7a3a' : '#7a2a2a';
-  ctx.lineWidth = 3;
+  // Dark gradient background.
+  gradientRect(ctx, 0, 0, ROULETTE_CANVAS_W, ROULETTE_CANVAS_H, 16, '#0a0e0a', '#0d1117');
+
+  // Neon border.
+  roundRect(ctx, 0, 0, ROULETTE_CANVAS_W, ROULETTE_CANVAS_H, 16);
+  ctx.strokeStyle = won ? '#00ff88' : '#ff3366';
+  ctx.lineWidth = 2;
   ctx.stroke();
 
   // Player label.
-  ctx.fillStyle = LABEL_COLOR;
-  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 16px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(playerName, ROULETTE_CANVAS_W / 2, 8);
+  ctx.fillText(playerName, ROULETTE_CANVAS_W / 2, 12);
 
   const cx = ROULETTE_CANVAS_W / 2;
-  const cy = 120;
+  const cy = 150;
 
-  // Outer wheel ring.
+  // Outer glow ring.
+  const numColor = ROULETTE_COLORS[color] || '#ffffff';
+  glowCircle(ctx, cx, cy, WHEEL_RADIUS + 30, won ? 'rgba(0, 255, 136, 0.08)' : 'rgba(255, 51, 102, 0.08)');
+
+  // Outer wheel ring (metallic).
   ctx.beginPath();
-  ctx.arc(cx, cy, WHEEL_RADIUS + 6, 0, Math.PI * 2);
-  ctx.fillStyle = '#8b7355';
+  ctx.arc(cx, cy, WHEEL_RADIUS + 8, 0, Math.PI * 2);
+  const ringGrad = ctx.createRadialGradient(cx, cy, WHEEL_RADIUS, cx, cy, WHEEL_RADIUS + 8);
+  ringGrad.addColorStop(0, '#a08050');
+  ringGrad.addColorStop(1, '#6b5030');
+  ctx.fillStyle = ringGrad;
   ctx.fill();
 
-  // Wheel segments (simplified: alternating red/black with green at top).
+  // Wheel segments.
   const segments = 37;
   const segAngle = (Math.PI * 2) / segments;
-  // European roulette order.
   const wheelOrder = [
     0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36,
     11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9,
@@ -801,37 +929,40 @@ function renderRoulette({ number, color, won, playerName = 'Player' }) {
     ctx.fill();
 
     // Segment border.
-    ctx.strokeStyle = '#333333';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
     ctx.lineWidth = 0.5;
     ctx.stroke();
   }
 
-  // Inner circle (hub).
+  // Inner circle (hub) with gradient.
   ctx.beginPath();
-  ctx.arc(cx, cy, 28, 0, Math.PI * 2);
-  ctx.fillStyle = '#2a2a2a';
+  ctx.arc(cx, cy, 32, 0, Math.PI * 2);
+  const hubGrad = ctx.createRadialGradient(cx - 5, cy - 5, 2, cx, cy, 32);
+  hubGrad.addColorStop(0, '#3a3a3a');
+  hubGrad.addColorStop(1, '#1a1a1a');
+  ctx.fillStyle = hubGrad;
   ctx.fill();
-  ctx.strokeStyle = '#8b7355';
+  ctx.strokeStyle = '#a08050';
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  // Winning number in the center.
-  const numColor = ROULETTE_COLORS[color] || '#ffffff';
-  ctx.fillStyle = numColor;
-  ctx.font = 'bold 24px Arial, sans-serif';
+  // Winning number in the center with glow.
+  glowCircle(ctx, cx, cy, 20, numColor === '#212121' ? 'rgba(255,255,255,0.15)' : numColor.replace(')', ',0.3)').replace('rgb', 'rgba'));
+  ctx.fillStyle = numColor === '#212121' ? '#ffffff' : numColor;
+  ctx.font = 'bold 28px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(String(number), cx, cy);
 
   // Result label below the wheel.
-  ctx.fillStyle = numColor;
-  ctx.font = 'bold 18px Arial, sans-serif';
+  ctx.fillStyle = numColor === '#212121' ? '#ffffff' : numColor;
+  ctx.font = 'bold 22px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText(
     `${number} ${color.toUpperCase()}`,
     cx,
-    cy + WHEEL_RADIUS + 14
+    cy + WHEEL_RADIUS + 18
   );
 
   return canvas.toBuffer('image/png');
@@ -839,14 +970,14 @@ function renderRoulette({ number, color, won, playerName = 'Player' }) {
 
 // ─── Russian Roulette Renderer ──────────────────────────────────────────────
 
-const RR_CANVAS_W = 320;
-const RR_CANVAS_H = 220;
-const CHAMBER_RADIUS = 60;
-const BULLET_RADIUS = 8;
+const RR_CANVAS_W = 420;
+const RR_CANVAS_H = 300;
+const CHAMBER_RADIUS = 80;
+const BULLET_RADIUS = 10;
 
 /**
- * Renders a Russian Roulette result as a PNG buffer showing the revolver
- * cylinder with the winner highlighted.
+ * Renders a Russian Roulette result as a PNG buffer with a glowing
+ * revolver cylinder and the winner highlighted.
  *
  * @param {object} options
  * @param {Array<{id: string, username: string}>} options.players - All players.
@@ -858,33 +989,43 @@ function renderRussianRoulette({ players, winnerUsername, pot }) {
   const canvas = createCanvas(RR_CANVAS_W, RR_CANVAS_H);
   const ctx = canvas.getContext('2d');
 
-  // Background.
-  roundRect(ctx, 0, 0, RR_CANVAS_W, RR_CANVAS_H, 12);
-  ctx.fillStyle = '#1a1a1a';
-  ctx.fill();
-  ctx.strokeStyle = '#7a2a2a';
-  ctx.lineWidth = 3;
+  // Dark gradient background.
+  gradientRect(ctx, 0, 0, RR_CANVAS_W, RR_CANVAS_H, 16, '#1a0a0a', '#0d1117');
+
+  // Neon border (red theme).
+  roundRect(ctx, 0, 0, RR_CANVAS_W, RR_CANVAS_H, 16);
+  ctx.strokeStyle = '#ff3366';
+  ctx.lineWidth = 2;
   ctx.stroke();
 
   // Title.
-  ctx.fillStyle = LABEL_COLOR;
-  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.fillStyle = '#ff3366';
+  ctx.font = 'bold 18px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText('RUSSIAN ROULETTE', RR_CANVAS_W / 2, 8);
+  ctx.fillText('RUSSIAN ROULETTE', RR_CANVAS_W / 2, 14);
 
   const cx = RR_CANVAS_W / 2;
-  const cy = 110;
+  const cy = 145;
 
-  // Cylinder body.
+  // Outer glow.
+  glowCircle(ctx, cx, cy, CHAMBER_RADIUS + 30, 'rgba(255, 51, 102, 0.06)');
+
+  // Cylinder body (metallic gradient).
   ctx.beginPath();
-  ctx.arc(cx, cy, CHAMBER_RADIUS + 6, 0, Math.PI * 2);
-  ctx.fillStyle = '#555555';
+  ctx.arc(cx, cy, CHAMBER_RADIUS + 8, 0, Math.PI * 2);
+  const outerGrad = ctx.createRadialGradient(cx, cy, CHAMBER_RADIUS - 10, cx, cy, CHAMBER_RADIUS + 8);
+  outerGrad.addColorStop(0, '#555555');
+  outerGrad.addColorStop(1, '#333333');
+  ctx.fillStyle = outerGrad;
   ctx.fill();
 
   ctx.beginPath();
   ctx.arc(cx, cy, CHAMBER_RADIUS, 0, Math.PI * 2);
-  ctx.fillStyle = '#333333';
+  const innerGrad = ctx.createRadialGradient(cx - 10, cy - 10, 5, cx, cy, CHAMBER_RADIUS);
+  innerGrad.addColorStop(0, '#444444');
+  innerGrad.addColorStop(1, '#222222');
+  ctx.fillStyle = innerGrad;
   ctx.fill();
 
   // Draw chambers for each player.
@@ -893,37 +1034,45 @@ function renderRussianRoulette({ players, winnerUsername, pot }) {
 
   for (let i = 0; i < count; i++) {
     const angle = i * angleStep - Math.PI / 2;
-    const bx = cx + Math.cos(angle) * (CHAMBER_RADIUS - 20);
-    const by = cy + Math.sin(angle) * (CHAMBER_RADIUS - 20);
+    const bx = cx + Math.cos(angle) * (CHAMBER_RADIUS - 24);
+    const by = cy + Math.sin(angle) * (CHAMBER_RADIUS - 24);
 
     const player = players[i];
     const isWinner = player && player.username === winnerUsername;
 
+    // Chamber glow for winner.
+    if (isWinner) {
+      glowCircle(ctx, bx, by, BULLET_RADIUS + 10, 'rgba(0, 255, 136, 0.4)');
+    }
+
     // Chamber circle.
     ctx.beginPath();
     ctx.arc(bx, by, BULLET_RADIUS, 0, Math.PI * 2);
-    ctx.fillStyle = isWinner ? '#00ff88' : '#1a1a1a';
+    ctx.fillStyle = isWinner ? '#00ff88' : '#0d0d0d';
     ctx.fill();
-    ctx.strokeStyle = isWinner ? '#00ff88' : '#666666';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = isWinner ? '#00ff88' : '#555555';
+    ctx.lineWidth = 2;
     ctx.stroke();
   }
 
   // Center hub.
   ctx.beginPath();
-  ctx.arc(cx, cy, 12, 0, Math.PI * 2);
-  ctx.fillStyle = '#444444';
+  ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+  const hubGrad = ctx.createRadialGradient(cx, cy, 2, cx, cy, 14);
+  hubGrad.addColorStop(0, '#666666');
+  hubGrad.addColorStop(1, '#333333');
+  ctx.fillStyle = hubGrad;
   ctx.fill();
 
   // Winner label.
   ctx.fillStyle = '#00ff88';
-  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.font = 'bold 18px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText(
     `${winnerUsername} wins ${pot.toLocaleString()} coins!`,
     cx,
-    cy + CHAMBER_RADIUS + 14
+    cy + CHAMBER_RADIUS + 18
   );
 
   return canvas.toBuffer('image/png');
@@ -1916,6 +2065,431 @@ function renderReward({
   return canvas.toBuffer('image/png');
 }
 
+// ─── Mines Renderer ─────────────────────────────────────────────────────────
+
+const MINES_TILE = 44;
+const MINES_GAP = 6;
+const MINES_GRID = 5;
+const MINES_PAD = 24;
+
+/**
+ * Renders a mines game board as a PNG buffer.
+ *
+ * @param {object} options
+ * @param {number[]} options.revealed - Indices of revealed safe tiles.
+ * @param {number[]} options.minePositions - Indices of mine tiles.
+ * @param {boolean} options.exploded - Whether the player hit a mine.
+ * @param {boolean} options.cashedOut - Whether the player cashed out.
+ * @param {number} options.multiplier - Current multiplier.
+ * @param {string} [options.playerName='Player'] - Display name.
+ * @returns {Buffer} PNG image buffer.
+ */
+function renderMines({
+  revealed = [],
+  minePositions = [],
+  exploded = false,
+  cashedOut = false,
+  multiplier = 1,
+  playerName = 'Player',
+}) {
+  const gridPx = MINES_GRID * MINES_TILE + (MINES_GRID - 1) * MINES_GAP;
+  const canvasW = gridPx + MINES_PAD * 2;
+  const canvasH = gridPx + MINES_PAD * 2 + 70; // extra for header + footer
+  const canvas = createCanvas(canvasW, canvasH);
+  const ctx = canvas.getContext('2d');
+
+  const gameOver = exploded || cashedOut;
+  const mineSet = new Set(minePositions);
+  const revealedSet = new Set(revealed);
+
+  // Background.
+  gradientRect(ctx, 0, 0, canvasW, canvasH, 16,
+    exploded ? '#1a0a0a' : cashedOut ? '#0a1a10' : '#0d0e14', '#0d1117');
+
+  // Border.
+  roundRect(ctx, 0, 0, canvasW, canvasH, 16);
+  ctx.strokeStyle = exploded ? '#ff3366' : cashedOut ? '#00ff88' : '#9b59b6';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Player label.
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(playerName, canvasW / 2, 12);
+
+  // Draw grid.
+  const gridStartX = MINES_PAD;
+  const gridStartY = 42;
+
+  for (let row = 0; row < MINES_GRID; row++) {
+    for (let col = 0; col < MINES_GRID; col++) {
+      const idx = row * MINES_GRID + col;
+      const tx = gridStartX + col * (MINES_TILE + MINES_GAP);
+      const ty = gridStartY + row * (MINES_TILE + MINES_GAP);
+
+      const isMine = mineSet.has(idx);
+      const isRevealed = revealedSet.has(idx);
+      const showMine = gameOver && isMine;
+
+      if (isRevealed && !isMine) {
+        // Revealed safe tile (gem).
+        roundRect(ctx, tx, ty, MINES_TILE, MINES_TILE, 6);
+        ctx.fillStyle = '#0a2a1a';
+        ctx.fill();
+        ctx.strokeStyle = '#00ff88';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Gem symbol.
+        ctx.fillStyle = '#00ff88';
+        ctx.font = 'bold 20px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('\u2666', tx + MINES_TILE / 2, ty + MINES_TILE / 2);
+      } else if (showMine) {
+        // Revealed mine.
+        const hitThis = isRevealed && isMine;
+        roundRect(ctx, tx, ty, MINES_TILE, MINES_TILE, 6);
+        ctx.fillStyle = hitThis ? '#4a0a0a' : '#2a0a0a';
+        ctx.fill();
+        ctx.strokeStyle = '#ff3366';
+        ctx.lineWidth = hitThis ? 3 : 1.5;
+        ctx.stroke();
+
+        if (hitThis) {
+          glowCircle(ctx, tx + MINES_TILE / 2, ty + MINES_TILE / 2, MINES_TILE / 2, 'rgba(255,51,102,0.3)');
+        }
+
+        // Mine symbol.
+        ctx.fillStyle = '#ff3366';
+        ctx.font = 'bold 20px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('\u2716', tx + MINES_TILE / 2, ty + MINES_TILE / 2);
+      } else {
+        // Hidden tile.
+        roundRect(ctx, tx, ty, MINES_TILE, MINES_TILE, 6);
+        const tileGrad = ctx.createLinearGradient(tx, ty, tx, ty + MINES_TILE);
+        tileGrad.addColorStop(0, '#2a2a3e');
+        tileGrad.addColorStop(1, '#1a1a2e');
+        ctx.fillStyle = tileGrad;
+        ctx.fill();
+        ctx.strokeStyle = '#333355';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    }
+  }
+
+  // Footer: multiplier.
+  const footerY = gridStartY + MINES_GRID * (MINES_TILE + MINES_GAP) + 10;
+  if (cashedOut) {
+    ctx.fillStyle = '#00ff88';
+    ctx.font = 'bold 22px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`${multiplier}x`, canvasW / 2, footerY);
+  } else if (exploded) {
+    ctx.fillStyle = '#ff3366';
+    ctx.font = 'bold 22px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('BOOM!', canvasW / 2, footerY);
+  } else {
+    ctx.fillStyle = '#9b59b6';
+    ctx.font = 'bold 18px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`${multiplier}x`, canvasW / 2, footerY);
+  }
+
+  return canvas.toBuffer('image/png');
+}
+
+// ─── Plinko Renderer ────────────────────────────────────────────────────────
+
+const PLINKO_W = 420;
+const PLINKO_H = 360;
+const PLINKO_ROWS = 8;
+
+/**
+ * Renders a plinko board result as a PNG buffer.
+ *
+ * @param {object} options
+ * @param {number[]} options.path - Array of 0/1 for each row (0=left, 1=right).
+ * @param {number} options.slot - The final slot index (0 to PLINKO_ROWS).
+ * @param {number} options.multiplier - The payout multiplier.
+ * @param {boolean} options.won - Whether the player profited.
+ * @param {string} [options.playerName='Player'] - Display name.
+ * @returns {Buffer} PNG image buffer.
+ */
+function renderPlinko({ path = [], slot = 0, multiplier = 1, won = false, playerName = 'Player' }) {
+  const canvas = createCanvas(PLINKO_W, PLINKO_H);
+  const ctx = canvas.getContext('2d');
+
+  // Background.
+  gradientRect(ctx, 0, 0, PLINKO_W, PLINKO_H, 16, '#0d0a1a', '#0d1117');
+
+  // Border.
+  roundRect(ctx, 0, 0, PLINKO_W, PLINKO_H, 16);
+  ctx.strokeStyle = won ? '#00ff88' : '#ff9900';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Player label.
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(playerName, PLINKO_W / 2, 12);
+
+  const pegRadius = 4;
+  const startY = 50;
+  const rowSpacing = 28;
+  const pegSpacing = 32;
+
+  // Draw pegs and ball path.
+  let ballX = PLINKO_W / 2;
+  let ballY = startY;
+
+  for (let row = 0; row < PLINKO_ROWS; row++) {
+    const pegsInRow = row + 3;
+    const rowWidth = (pegsInRow - 1) * pegSpacing;
+    const rowStartX = (PLINKO_W - rowWidth) / 2;
+    const rowY = startY + row * rowSpacing;
+
+    for (let p = 0; p < pegsInRow; p++) {
+      const px = rowStartX + p * pegSpacing;
+
+      ctx.beginPath();
+      ctx.arc(px, rowY, pegRadius, 0, Math.PI * 2);
+      ctx.fillStyle = '#555577';
+      ctx.fill();
+    }
+
+    // Ball position after this row.
+    if (row < path.length) {
+      const dir = path[row]; // 0=left, 1=right
+      const nextPegsInRow = row + 4;
+      const nextRowWidth = (nextPegsInRow - 1) * pegSpacing;
+      const nextRowStartX = (PLINKO_W - nextRowWidth) / 2;
+      const nextRowY = startY + (row + 1) * rowSpacing;
+
+      // Calculate ball position between pegs.
+      const pegIdx = Math.floor((ballX - rowStartX) / pegSpacing);
+      const nextPegIdx = Math.min(pegIdx + dir, nextPegsInRow - 1);
+      ballX = nextRowStartX + nextPegIdx * pegSpacing;
+      ballY = nextRowY;
+
+      // Draw trail segment.
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(ballX, ballY - rowSpacing);
+      ctx.lineTo(ballX, ballY);
+      ctx.stroke();
+    }
+  }
+
+  // Draw ball at final position.
+  glowCircle(ctx, ballX, ballY, 16, 'rgba(255, 215, 0, 0.3)');
+  ctx.beginPath();
+  ctx.arc(ballX, ballY, 8, 0, Math.PI * 2);
+  const ballGrad = ctx.createRadialGradient(ballX - 2, ballY - 2, 1, ballX, ballY, 8);
+  ballGrad.addColorStop(0, '#fff8dc');
+  ballGrad.addColorStop(1, '#ffd700');
+  ctx.fillStyle = ballGrad;
+  ctx.fill();
+
+  // Draw multiplier slots at the bottom.
+  const slotCount = PLINKO_ROWS + 1;
+  const slotW = 36;
+  const slotH = 28;
+  const slotGap = 4;
+  const totalSlotW = slotCount * slotW + (slotCount - 1) * slotGap;
+  const slotStartX = (PLINKO_W - totalSlotW) / 2;
+  const slotY = startY + PLINKO_ROWS * rowSpacing + 20;
+
+  // Multiplier values (symmetric, higher at edges).
+  const slotMultipliers = [];
+  const mid = Math.floor(slotCount / 2);
+  for (let i = 0; i < slotCount; i++) {
+    const dist = Math.abs(i - mid);
+    slotMultipliers.push(parseFloat((1 + dist * 0.8).toFixed(1)));
+  }
+
+  for (let i = 0; i < slotCount; i++) {
+    const sx = slotStartX + i * (slotW + slotGap);
+    const isActive = i === slot;
+    const m = slotMultipliers[i];
+
+    roundRect(ctx, sx, slotY, slotW, slotH, 4);
+    if (isActive) {
+      ctx.fillStyle = won ? '#0a2a1a' : '#2a1a00';
+      ctx.fill();
+      ctx.strokeStyle = won ? '#00ff88' : '#ff9900';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fill();
+      ctx.strokeStyle = '#333355';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = isActive ? (won ? '#00ff88' : '#ff9900') : '#666688';
+    ctx.font = isActive ? 'bold 12px Arial, sans-serif' : '11px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${m}x`, sx + slotW / 2, slotY + slotH / 2);
+  }
+
+  // Result text.
+  const resultY = slotY + slotH + 16;
+  ctx.fillStyle = won ? '#00ff88' : '#ff9900';
+  ctx.font = 'bold 24px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(`${multiplier}x`, PLINKO_W / 2, resultY);
+
+  return canvas.toBuffer('image/png');
+}
+
+// ─── Wheel of Fortune Renderer ──────────────────────────────────────────────
+
+const WOF_W = 420;
+const WOF_H = 340;
+const WOF_RADIUS = 120;
+
+/**
+ * Renders a wheel of fortune result as a PNG buffer.
+ *
+ * @param {object} options
+ * @param {Array<{label: string, multiplier: number, color: string}>} options.segments - Wheel segments.
+ * @param {number} options.winningIndex - Index of the winning segment.
+ * @param {number} options.multiplier - The payout multiplier.
+ * @param {boolean} options.won - Whether the player profited.
+ * @param {string} [options.playerName='Player'] - Display name.
+ * @returns {Buffer} PNG image buffer.
+ */
+function renderWheel({
+  segments = [],
+  winningIndex = 0,
+  multiplier = 1,
+  won = false,
+  playerName = 'Player',
+}) {
+  const canvas = createCanvas(WOF_W, WOF_H);
+  const ctx = canvas.getContext('2d');
+
+  // Background.
+  gradientRect(ctx, 0, 0, WOF_W, WOF_H, 16, '#0d0a1a', '#0d1117');
+
+  // Border.
+  roundRect(ctx, 0, 0, WOF_W, WOF_H, 16);
+  ctx.strokeStyle = won ? '#00ff88' : '#ff3366';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Player label.
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(playerName, WOF_W / 2, 12);
+
+  const cx = WOF_W / 2;
+  const cy = 160;
+  const segCount = segments.length || 1;
+  const segAngle = (Math.PI * 2) / segCount;
+
+  // Outer glow.
+  glowCircle(ctx, cx, cy, WOF_RADIUS + 30, won ? 'rgba(0, 255, 136, 0.06)' : 'rgba(255, 51, 102, 0.06)');
+
+  // Outer ring.
+  ctx.beginPath();
+  ctx.arc(cx, cy, WOF_RADIUS + 8, 0, Math.PI * 2);
+  const ringGrad = ctx.createRadialGradient(cx, cy, WOF_RADIUS, cx, cy, WOF_RADIUS + 8);
+  ringGrad.addColorStop(0, '#888888');
+  ringGrad.addColorStop(1, '#444444');
+  ctx.fillStyle = ringGrad;
+  ctx.fill();
+
+  // Rotate so winning segment is at the top (pointer position).
+  const rotationOffset = -winningIndex * segAngle - segAngle / 2 - Math.PI / 2;
+
+  // Draw segments.
+  for (let i = 0; i < segCount; i++) {
+    const startAngle = rotationOffset + i * segAngle;
+    const endAngle = startAngle + segAngle;
+    const seg = segments[i] || { color: '#333355' };
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, WOF_RADIUS, startAngle, endAngle);
+    ctx.closePath();
+    ctx.fillStyle = seg.color;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Segment label.
+    const midAngle = startAngle + segAngle / 2;
+    const labelR = WOF_RADIUS * 0.65;
+    const lx = cx + Math.cos(midAngle) * labelR;
+    const ly = cy + Math.sin(midAngle) * labelR;
+
+    ctx.save();
+    ctx.translate(lx, ly);
+    ctx.rotate(midAngle + Math.PI / 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 13px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(seg.label || '', 0, 0);
+    ctx.restore();
+  }
+
+  // Center hub.
+  ctx.beginPath();
+  ctx.arc(cx, cy, 20, 0, Math.PI * 2);
+  const hubGrad = ctx.createRadialGradient(cx, cy, 2, cx, cy, 20);
+  hubGrad.addColorStop(0, '#555555');
+  hubGrad.addColorStop(1, '#222222');
+  ctx.fillStyle = hubGrad;
+  ctx.fill();
+  ctx.strokeStyle = '#888888';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Pointer (triangle at top).
+  const pointerY = cy - WOF_RADIUS - 12;
+  ctx.beginPath();
+  ctx.moveTo(cx, pointerY + 18);
+  ctx.lineTo(cx - 10, pointerY);
+  ctx.lineTo(cx + 10, pointerY);
+  ctx.closePath();
+  ctx.fillStyle = '#ffd700';
+  ctx.fill();
+  ctx.strokeStyle = '#b8860b';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Result text.
+  const resultY = cy + WOF_RADIUS + 20;
+  ctx.fillStyle = won ? '#00ff88' : '#ff3366';
+  ctx.font = 'bold 28px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(`${multiplier}x`, WOF_W / 2, resultY);
+
+  return canvas.toBuffer('image/png');
+}
+
 module.exports = {
   renderBlackjackTable,
   renderCoinflip,
@@ -1933,4 +2507,7 @@ module.exports = {
   renderDeposit,
   renderWithdraw,
   renderReward,
+  renderMines,
+  renderPlinko,
+  renderWheel,
 };
