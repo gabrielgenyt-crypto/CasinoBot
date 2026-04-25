@@ -4,10 +4,7 @@ const { playRoulette, BET_TYPES } = require('../games/roulette');
 const {
   COLORS,
   DIVIDER,
-  SPARKLE_LINE,
   rouletteWheel,
-  winBanner,
-  lossBanner,
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
@@ -42,24 +39,6 @@ const data = new SlashCommandBuilder()
       .setMinValue(0)
       .setMaxValue(36)
   );
-
-/**
- * Builds the roulette table ASCII art showing the result.
- * @param {number} num - The winning number.
- * @param {string} col - The winning color.
- * @returns {string}
- */
-function rouletteResult(num, col) {
-  const colorEmoji = { red: '🔴', black: '⚫', green: '🟢' };
-  const emoji = colorEmoji[col] || '⚪';
-  return [
-    '```',
-    '  ╔═══════════════╗',
-    `  ║   ${emoji}  ${String(num).padStart(2, ' ')}  ${emoji}   ║`,
-    '  ╚═══════════════╝',
-    '```',
-  ].join('\n');
-}
 
 async function execute(interaction) {
   const userId = interaction.user.id;
@@ -154,10 +133,6 @@ async function execute(interaction) {
 
   const colorEmoji = { red: '🔴', black: '⚫', green: '🟢' };
   const color = result.won ? COLORS.win : COLORS.lose;
-  const isBigWin = result.won && result.payout >= bet * 5;
-  const outcomeText = result.won
-    ? winBanner(result.payout, isBigWin)
-    : lossBanner(bet);
 
   // Render the roulette wheel image.
   const pngBuffer = renderRoulette({
@@ -169,20 +144,11 @@ async function execute(interaction) {
   const attachment = new AttachmentBuilder(pngBuffer, { name: 'roulette.png' });
 
   const finalEmbed = new EmbedBuilder()
-    .setTitle(
-      isBigWin
-        ? `${EMOJIS.roulette}${EMOJIS.coin}  ${colorEmoji[result.color]} ${result.number}  ${EMOJIS.coin}${EMOJIS.roulette}`
-        : `${EMOJIS.roulette}  ${colorEmoji[result.color]} ${result.number}  ${EMOJIS.roulette}`
-    )
+    .setTitle(`${EMOJIS.roulette}  ${colorEmoji[result.color] || '⚪'} ${result.number}  ${EMOJIS.roulette}`)
     .setDescription(
-      (isBigWin ? `${SPARKLE_LINE}\n` : '') +
-      `${DIVIDER}\n\n` +
-      `${rouletteResult(result.number, result.color)}\n` +
-      `The ball landed on **${result.number}** (${result.color})\n` +
-      `You bet on **${result.betLabel}**\n\n` +
-      `${outcomeText}\n\n` +
-      DIVIDER +
-      (isBigWin ? `\n${SPARKLE_LINE}` : '')
+      result.won
+        ? `**+${result.payout.toLocaleString()}** coins -- bet on **${result.betLabel}**`
+        : `Landed on **${result.number}** (${result.color}) -- bet was **${result.betLabel}**`
     )
     .setColor(color)
     .setImage('attachment://roulette.png')

@@ -4,10 +4,6 @@ const { playCrash } = require('../games/crash');
 const {
   COLORS,
   DIVIDER,
-  SPARKLE_LINE,
-  crashGraph,
-  winBanner,
-  lossBanner,
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
@@ -123,15 +119,6 @@ async function execute(interaction) {
 
   const won = result.won;
   const color = won ? COLORS.win : COLORS.lose;
-  const outcomeText = won
-    ? winBanner(result.payout, result.cashout >= 5)
-    : lossBanner(bet);
-
-  const statusLine = won
-    ? `✅ Cashed out at **${result.cashout}x**!`
-    : `💥 **CRASHED** at **${result.crashPoint}x**!`;
-
-  const graph = crashGraph(result.crashPoint);
 
   // Render the crash graph image.
   const pngBuffer = renderCrash({
@@ -145,14 +132,9 @@ async function execute(interaction) {
   const finalEmbed = new EmbedBuilder()
     .setTitle(won ? `${EMOJIS.rocket}${EMOJIS.coin}  CASHED OUT  ${EMOJIS.coin}${EMOJIS.rocket}` : '💥  C R A S H E D  💥')
     .setDescription(
-      (won && result.cashout >= 5 ? `${SPARKLE_LINE}\n` : '') +
-      `${DIVIDER}\n\n` +
-      `${graph}\n\n` +
-      `${statusLine}\n` +
-      `Target: **${result.cashout}x** | Crashed at: **${result.crashPoint}x**\n\n` +
-      `${outcomeText}\n\n` +
-      DIVIDER +
-      (won && result.cashout >= 5 ? `\n${SPARKLE_LINE}` : '')
+      won
+        ? `**+${result.payout.toLocaleString()}** coins at **${result.cashout}x**`
+        : `Crashed at **${result.crashPoint}x** -- target was **${result.cashout}x**`
     )
     .setColor(color)
     .setImage('attachment://crash.png')

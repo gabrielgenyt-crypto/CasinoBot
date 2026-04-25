@@ -4,10 +4,7 @@ const { playSlots } = require('../games/slots');
 const {
   COLORS,
   DIVIDER,
-  SPARKLE_LINE,
   slotMachine,
-  winBanner,
-  lossBanner,
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
@@ -102,22 +99,14 @@ async function execute(interaction) {
 
   const isJackpot = result.multiplier >= 10;
   let color;
-  let outcomeText;
 
   if (isJackpot) {
     color = COLORS.jackpot;
-    outcomeText = winBanner(result.payout, true);
   } else if (result.won) {
     color = COLORS.win;
-    outcomeText = winBanner(result.payout, false);
   } else {
     color = COLORS.lose;
-    outcomeText = lossBanner(bet);
   }
-
-  const multiplierText = result.won
-    ? `Multiplier: **${result.multiplier}x**`
-    : 'Better luck next time!';
 
   // Render the slot machine result image.
   const pngBuffer = renderSlots({
@@ -129,15 +118,11 @@ async function execute(interaction) {
   const attachment = new AttachmentBuilder(pngBuffer, { name: 'slots.png' });
 
   const finalEmbed = new EmbedBuilder()
-    .setTitle(isJackpot ? `${EMOJIS.slots}${EMOJIS.coin} J A C K P O T ${EMOJIS.coin}${EMOJIS.slots}` : `${EMOJIS.slots}  S L O T   M A C H I N E  ${EMOJIS.slots}`)
+    .setTitle(isJackpot ? `${EMOJIS.slots}${EMOJIS.coin} J A C K P O T ${EMOJIS.coin}${EMOJIS.slots}` : `${EMOJIS.slots}  S L O T S  ${EMOJIS.slots}`)
     .setDescription(
-      (isJackpot ? `${SPARKLE_LINE}\n` : '') +
-      `${DIVIDER}\n` +
-      slotMachine(reels) +
-      `\n${outcomeText}\n` +
-      `${multiplierText}\n` +
-      DIVIDER +
-      (isJackpot ? `\n${SPARKLE_LINE}` : '')
+      result.won
+        ? `**+${result.payout.toLocaleString()}** coins (${result.multiplier}x)`
+        : 'Better luck next time!'
     )
     .setColor(color)
     .setImage('attachment://slots.png')

@@ -4,9 +4,6 @@ const { playDice } = require('../games/dice');
 const {
   COLORS,
   DIVIDER,
-  SPARKLE_LINE,
-  winBanner,
-  lossBanner,
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
@@ -39,35 +36,6 @@ const data = new SlashCommandBuilder()
       .setMinValue(1)
       .setMaxValue(99)
   );
-
-/**
- * Builds a visual slider showing where the roll landed relative to the target.
- * @param {number} roll - The actual roll (1-100).
- * @param {number} target - The target number.
- * @param {string} direction - 'over' or 'under'.
- * @returns {string}
- */
-function rollSlider(roll, target, direction) {
-  const width = 20;
-  const rollPos = Math.round((roll / 100) * width);
-  const targetPos = Math.round((target / 100) * width);
-
-  let bar = '';
-  for (let i = 0; i <= width; i++) {
-    if (i === rollPos) {
-      bar += '🔵';
-    } else if (i === targetPos) {
-      bar += '🔶';
-    } else if (direction === 'over' && i > targetPos) {
-      bar += '▓';
-    } else if (direction === 'under' && i < targetPos) {
-      bar += '▓';
-    } else {
-      bar += '░';
-    }
-  }
-  return `\`1\` ${bar} \`100\``;
-}
 
 async function execute(interaction) {
   const userId = interaction.user.id;
@@ -155,15 +123,6 @@ async function execute(interaction) {
   await sleep(800);
 
   const color = result.won ? COLORS.win : COLORS.lose;
-  const isBigWin = result.won && result.multiplier >= 3;
-  const outcomeText = result.won
-    ? winBanner(result.payout, isBigWin)
-    : lossBanner(bet);
-
-  const resultEmoji = result.won ? '✅' : '❌';
-  const comparison = direction === 'over'
-    ? `**${result.roll}** ${result.won ? '>' : '≤'} **${target}**`
-    : `**${result.roll}** ${result.won ? '<' : '≥'} **${target}**`;
 
   // Render the dice result image.
   const pngBuffer = renderDice({
@@ -176,21 +135,11 @@ async function execute(interaction) {
   const attachment = new AttachmentBuilder(pngBuffer, { name: 'dice.png' });
 
   const finalEmbed = new EmbedBuilder()
-    .setTitle(
-      isBigWin
-        ? `${EMOJIS.dice}${EMOJIS.coin}  ROLLED ${result.roll}  ${EMOJIS.coin}${EMOJIS.dice}`
-        : `${EMOJIS.dice}  ROLLED ${result.roll}  ${EMOJIS.dice}`
-    )
+    .setTitle(`${EMOJIS.dice}  ROLLED ${result.roll}  ${EMOJIS.dice}`)
     .setDescription(
-      (isBigWin ? `${SPARKLE_LINE}\n` : '') +
-      `${DIVIDER}\n\n` +
-      `# ${EMOJIS.dice} ${result.roll}\n\n` +
-      `${rollSlider(result.roll, target, direction)}\n\n` +
-      `${resultEmoji} ${comparison}\n` +
-      `${dirEmoji} Target: **${direction} ${target}**\n\n` +
-      `${outcomeText}\n\n` +
-      DIVIDER +
-      (isBigWin ? `\n${SPARKLE_LINE}` : '')
+      result.won
+        ? `**+${result.payout.toLocaleString()}** coins (${result.multiplier}x)`
+        : `Rolled **${result.roll}** -- needed **${direction} ${target}**`
     )
     .setColor(color)
     .setImage('attachment://dice.png')

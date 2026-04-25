@@ -11,9 +11,6 @@ const { playCoinflip } = require('../games/coinflip');
 const {
   COLORS,
   DIVIDER,
-  SPARKLE_LINE,
-  winBanner,
-  lossBanner,
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
@@ -181,11 +178,7 @@ async function handleButton(interaction) {
   // ── Frame 4: Result ──
   await sleep(800);
 
-  const resultEmoji = result.side === 'heads' ? EMOJIS.heads : EMOJIS.tails;
   const color = result.won ? COLORS.win : COLORS.lose;
-  const outcomeText = result.won
-    ? winBanner(result.payout, false)
-    : lossBanner(bet);
 
   // Render the coinflip result image.
   const pngBuffer = renderCoinflip({
@@ -198,13 +191,9 @@ async function handleButton(interaction) {
   const finalEmbed = new EmbedBuilder()
     .setTitle(`🪙  ${result.side.toUpperCase()}!  🪙`)
     .setDescription(
-      (result.won ? `${SPARKLE_LINE}\n` : '') +
-      `${DIVIDER}\n\n` +
-      `${resultEmoji} The coin landed on **${result.side.toUpperCase()}**\n` +
-      `${choiceEmoji} You picked **${choice.toUpperCase()}**\n\n` +
-      `${outcomeText}\n\n` +
-      DIVIDER +
-      (result.won ? `\n${SPARKLE_LINE}` : '')
+      result.won
+        ? `**+${result.payout.toLocaleString()}** coins`
+        : `You picked **${choice.toUpperCase()}** -- better luck next time!`
     )
     .setColor(color)
     .setImage('attachment://coinflip.png')
