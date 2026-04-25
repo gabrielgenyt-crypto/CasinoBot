@@ -42,7 +42,10 @@ const data = new SlashCommandBuilder()
  */
 function buildCardImage(state, playerName, showDealer) {
   const playerVal = handValue(state.playerHand);
-  const dealerVal = showDealer ? handValue(state.dealerHand) : '?';
+  // Show the value of the dealer's visible card when not fully revealed.
+  const dealerVal = showDealer
+    ? handValue(state.dealerHand)
+    : handValue([state.dealerHand[0]]);
 
   const pngBuffer = renderBlackjackTable({
     playerHand: state.playerHand,
@@ -51,6 +54,7 @@ function buildCardImage(state, playerName, showDealer) {
     dealerValue: dealerVal,
     showDealer,
     playerName,
+    outcome: state.outcome || null,
   });
 
   return new AttachmentBuilder(pngBuffer, { name: 'blackjack.png' });
@@ -210,20 +214,31 @@ async function execute(interaction) {
     throw error;
   }
 
-  // ── Dealing animation ──
+  const playerName = interaction.user.username;
+
+  // ── Multi-frame dealing animation ──
+  const dealFrames = [
+    '🎴 Shuffling the deck...',
+    '🃏 Dealing your first card...',
+    '🃏 Dealing dealer\'s card...',
+    '🃏 Dealing your second card...',
+    '🂠 Dealer takes a face-down card...',
+  ];
+
   const dealingEmbed = new EmbedBuilder()
     .setTitle(`${EMOJIS.blackjack}  B L A C K J A C K  ${EMOJIS.blackjack}`)
-    .setDescription(
-      `${DIVIDER}\n\n` +
-      '🎴 Dealing cards...\n\n' +
-      DIVIDER
-    )
+    .setDescription(`${DIVIDER}\n\n${dealFrames[0]}\n\n${DIVIDER}`)
     .setColor(COLORS.pending);
 
   const msg = await interaction.reply({ embeds: [dealingEmbed], fetchReply: true });
-  await sleep(800);
 
-  const playerName = interaction.user.username;
+  // Animate through dealing frames.
+  for (let i = 1; i < dealFrames.length; i++) {
+    await sleep(500);
+    dealingEmbed.setDescription(`${DIVIDER}\n\n${dealFrames[i]}\n\n${DIVIDER}`);
+    await msg.edit({ embeds: [dealingEmbed] });
+  }
+  await sleep(400);
 
   // If the game resolved immediately (natural blackjack), show final state.
   if (state.outcome) {
@@ -258,6 +273,22 @@ async function handleButton(interaction) {
     });
   }
 
+  // ── Action animation text ──
+  const actionMessages = {
+    hit: '🃏 Drawing a card...',
+    stand: '✋ Standing — dealer\'s turn...',
+    double: `${EMOJIS.lightning} Doubling down!`,
+  };
+
+  // Show brief animation frame before processing.
+  const animEmbed = new EmbedBuilder()
+    .setTitle(`${EMOJIS.blackjack}  B L A C K J A C K  ${EMOJIS.blackjack}`)
+    .setDescription(`${DIVIDER}\n\n${actionMessages[action] || '...'}\n\n${DIVIDER}`)
+    .setColor(COLORS.pending);
+
+  await interaction.update({ embeds: [animEmbed], components: [] });
+  await sleep(600);
+
   let updatedState;
   try {
     switch (action) {
@@ -271,11 +302,11 @@ async function handleButton(interaction) {
       updatedState = double(state);
       break;
     default:
-      return interaction.reply({ content: '❌ Unknown action.', ephemeral: true });
+      return interaction.followUp({ content: '❌ Unknown action.', ephemeral: true });
     }
   } catch (error) {
     if (error.message === 'INSUFFICIENT_FUNDS') {
-      return interaction.reply({
+      return interaction.followUp({
         content: '❌ Insufficient funds to double down.',
         ephemeral: true,
       });
@@ -288,9 +319,20 @@ async function handleButton(interaction) {
   // If the game is resolved, clean up and show final state.
   if (updatedState.outcome) {
     activeGames.delete(ownerId);
+
+    // Show dealer drawing animation when standing or doubling.
+    if (action === 'stand' || action === 'double') {
+      const dealerDrawEmbed = new EmbedBuilder()
+        .setTitle(`${EMOJIS.blackjack}  B L A C K J A C K  ${EMOJIS.blackjack}`)
+        .setDescription(`${DIVIDER}\n\n🎴 Dealer reveals cards...\n\n${DIVIDER}`)
+        .setColor(COLORS.pending);
+      await interaction.editReply({ embeds: [dealerDrawEmbed] });
+      await sleep(700);
+    }
+
     const embed = buildEmbed(interaction, updatedState, true);
     const attachment = buildCardImage(updatedState, playerName, true);
-    return interaction.update({ embeds: [embed], files: [attachment], components: [] });
+    return interaction.editReply({ embeds: [embed], files: [attachment], components: [] });
   }
 
   // Game continues -- update the embed with buttons.
@@ -300,7 +342,7 @@ async function handleButton(interaction) {
   const attachment = buildCardImage(updatedState, playerName, false);
   const row = buildButtons(ownerId, canDouble);
 
-  return interaction.update({ embeds: [embed], files: [attachment], components: [row] });
+  return interaction.editReply({ embeds: [embed], files: [attachment], components: [row] });
 }
 
 module.exports = { data, execute, handleButton };
