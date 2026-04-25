@@ -59,6 +59,22 @@ const CATEGORIES = {
         name: '🔫 /russianroulette <bet>',
         value: 'Multiplayer elimination — last one standing wins the pot.',
       },
+      {
+        name: '🎱 /keno <bet> <picks>',
+        value: 'Pick up to 10 numbers from 1-40 and match the draw.',
+      },
+      {
+        name: '🎯 /limbo <bet> <target>',
+        value: 'Set a target multiplier — beat it to win instantly.',
+      },
+      {
+        name: '🗼 /tower <bet> [difficulty]',
+        value: 'Climb floors by picking safe tiles. Cash out anytime.',
+      },
+      {
+        name: '🃏 /hilo <bet>',
+        value: 'Guess if the next card is higher or lower. Keep going to multiply.',
+      },
     ],
   },
   economy: {
@@ -141,7 +157,7 @@ function buildOverviewEmbed() {
       `${EMOJIS.diamond} **Welcome to CryptoVault Casino!**\n` +
       'Your provably fair crypto casino on Discord.\n\n' +
       '**Select a category below** to see all available commands.\n\n' +
-      '🎰 **Casino Games** — 10 provably fair games\n' +
+      '🎰 **Casino Games** — 14 provably fair games\n' +
       '💰 **Economy & Wallet** — Deposits, withdrawals, tips\n' +
       '📊 **Stats & Social** — Leaderboards, VIP, history\n\n' +
       `${DIVIDER}`

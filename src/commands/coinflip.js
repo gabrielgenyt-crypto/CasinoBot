@@ -10,11 +10,10 @@ const { getBalance, ensureWallet } = require('../utils/wallet');
 const { playCoinflip } = require('../games/coinflip');
 const {
   COLORS,
-  DIVIDER,
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
-const { renderCoinflip } = require('../utils/cardRenderer');
+const { renderCoinflip, renderCoinflipAnim } = require('../utils/cardRenderer');
 
 // Temporary store for pending bets (userId -> bet amount).
 // Cleared once the user picks heads or tails.
@@ -123,60 +122,22 @@ async function handleButton(interaction) {
     throw error;
   }
 
-  const choiceEmoji = choice === 'heads' ? EMOJIS.heads : EMOJIS.tails;
+  // ── Animation frame: Flipping PNG ──
+  const animBuffer = renderCoinflipAnim({
+    playerName: interaction.user.username,
+    choice,
+  });
+  const animAttachment = new AttachmentBuilder(animBuffer, { name: 'flipping.png' });
 
-  // ── Frame 1: Coin in the air ──
-  const frame1 = new EmbedBuilder()
+  const animEmbed = new EmbedBuilder()
     .setTitle('🪙  C O I N F L I P  🪙')
-    .setDescription(
-      `${DIVIDER}\n\n` +
-      '```\n' +
-      '         🪙 ⬆️\n' +
-      '      *flipping*\n' +
-      '```\n' +
-      `${choiceEmoji} You picked **${choice.toUpperCase()}**\n\n` +
-      DIVIDER
-    )
-    .setColor(COLORS.pending);
+    .setColor(COLORS.pending)
+    .setImage('attachment://flipping.png');
 
-  await interaction.update({ embeds: [frame1], components: [] });
+  await interaction.update({ embeds: [animEmbed], files: [animAttachment], components: [] });
 
-  // ── Frame 2: Coin spinning ──
-  await sleep(600);
-  const frame2 = new EmbedBuilder()
-    .setTitle('🪙  C O I N F L I P  🪙')
-    .setDescription(
-      `${DIVIDER}\n\n` +
-      '```\n' +
-      '           🪙\n' +
-      '       *spinning*\n' +
-      '```\n' +
-      `${choiceEmoji} You picked **${choice.toUpperCase()}**\n\n` +
-      DIVIDER
-    )
-    .setColor(COLORS.pending);
-
-  await interaction.editReply({ embeds: [frame2] });
-
-  // ── Frame 3: Coin falling ──
-  await sleep(600);
-  const frame3 = new EmbedBuilder()
-    .setTitle('🪙  C O I N F L I P  🪙')
-    .setDescription(
-      `${DIVIDER}\n\n` +
-      '```\n' +
-      '      🪙 ⬇️\n' +
-      '      *falling*\n' +
-      '```\n' +
-      `${choiceEmoji} You picked **${choice.toUpperCase()}**\n\n` +
-      DIVIDER
-    )
-    .setColor(COLORS.pending);
-
-  await interaction.editReply({ embeds: [frame3] });
-
-  // ── Frame 4: Result ──
-  await sleep(800);
+  // ── Result after delay ──
+  await sleep(1800);
 
   const color = result.won ? COLORS.win : COLORS.lose;
 

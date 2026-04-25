@@ -3,15 +3,10 @@ const { getBalance, ensureWallet } = require('../utils/wallet');
 const { playSlots } = require('../games/slots');
 const {
   COLORS,
-  DIVIDER,
-  slotMachine,
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
-const { renderSlots } = require('../utils/cardRenderer');
-
-// Random spinning symbols for animation frames.
-const SPIN_SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '🔔', '7️⃣', EMOJIS.diamond, '⭐', EMOJIS.slots];
+const { renderSlots, renderSlotsAnim } = require('../utils/cardRenderer');
 
 const data = new SlashCommandBuilder()
   .setName('slots')
@@ -19,13 +14,6 @@ const data = new SlashCommandBuilder()
   .addIntegerOption((opt) =>
     opt.setName('bet').setDescription('Amount to wager').setRequired(true).setMinValue(1)
   );
-
-/**
- * Picks a random element from an array.
- */
-function randomSymbol() {
-  return SPIN_SYMBOLS[Math.floor(Math.random() * SPIN_SYMBOLS.length)];
-}
 
 async function execute(interaction) {
   const userId = interaction.user.id;
@@ -52,50 +40,19 @@ async function execute(interaction) {
     throw error;
   }
 
-  const reels = result.reels.map((r) => r.emoji);
+  // ── Animation frame: Rolling PNG ──
+  const animBuffer = renderSlotsAnim({ playerName: interaction.user.username });
+  const animAttachment = new AttachmentBuilder(animBuffer, { name: 'rolling.png' });
 
-  // ── Frame 1: Machine starting ──
-  const frame1 = new EmbedBuilder()
+  const animEmbed = new EmbedBuilder()
     .setTitle(`${EMOJIS.slots}  S L O T   M A C H I N E  ${EMOJIS.slots}`)
-    .setDescription(
-      `${DIVIDER}\n` +
-      slotMachine(['❓', '❓', '❓'], true) +
-      `\n${interaction.user.username} pulls the lever...\n` +
-      `Bet: **${bet.toLocaleString()}** coins\n` +
-      DIVIDER
-    )
-    .setColor(COLORS.pending);
+    .setColor(COLORS.pending)
+    .setImage('attachment://rolling.png');
 
-  const msg = await interaction.reply({ embeds: [frame1], fetchReply: true });
+  const msg = await interaction.reply({ embeds: [animEmbed], files: [animAttachment], fetchReply: true });
 
-  // ── Frame 2: First reel stops ──
-  await sleep(700);
-  const frame2 = new EmbedBuilder()
-    .setTitle(`${EMOJIS.slots}  S L O T   M A C H I N E  ${EMOJIS.slots}`)
-    .setDescription(
-      `${DIVIDER}\n` +
-      slotMachine([reels[0], randomSymbol(), randomSymbol()]) +
-      '\n🔄 Spinning...\n' +
-      DIVIDER
-    )
-    .setColor(COLORS.pending);
-  await msg.edit({ embeds: [frame2] });
-
-  // ── Frame 3: Second reel stops ──
-  await sleep(700);
-  const frame3 = new EmbedBuilder()
-    .setTitle(`${EMOJIS.slots}  S L O T   M A C H I N E  ${EMOJIS.slots}`)
-    .setDescription(
-      `${DIVIDER}\n` +
-      slotMachine([reels[0], reels[1], randomSymbol()]) +
-      '\n🔄 Almost there...\n' +
-      DIVIDER
-    )
-    .setColor(COLORS.pending);
-  await msg.edit({ embeds: [frame3] });
-
-  // ── Frame 4: All reels stopped -- result ──
-  await sleep(900);
+  // ── Result after delay ──
+  await sleep(2000);
 
   const isJackpot = result.multiplier >= 10;
   let color;

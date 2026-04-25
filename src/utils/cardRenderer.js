@@ -2557,6 +2557,381 @@ function renderWheel({
   return canvas.toBuffer('image/png');
 }
 
+// ─── Game Animation Renderers ───────────────────────────────────────────────
+// These produce "in-progress" PNG images shown during the animation phase of
+// each game, replacing the old text-based embed frames.
+
+const ANIM_W = 420;
+const ANIM_H = 200;
+
+/**
+ * Shared helper: renders a generic game animation PNG with a title, an
+ * animated-style status line, and an optional icon drawn via a callback.
+ *
+ * @param {object} options
+ * @param {string} options.title - Game title (e.g. "COINFLIP").
+ * @param {string} options.status - Status text (e.g. "Flipping . . .").
+ * @param {string} options.accentColor - Neon accent color.
+ * @param {string} [options.playerName] - Player display name.
+ * @param {string} [options.subtitle] - Extra info line below status.
+ * @param {(ctx: CanvasRenderingContext2D, cx: number, cy: number) => void} [options.drawIcon]
+ * @returns {Buffer} PNG image buffer.
+ */
+function renderAnimationFrame({
+  title,
+  status,
+  accentColor = '#5865f2',
+  playerName = '',
+  subtitle = '',
+  drawIcon = null,
+}) {
+  const canvas = createCanvas(ANIM_W, ANIM_H);
+  const ctx = canvas.getContext('2d');
+
+  // Dark gradient background.
+  gradientRect(ctx, 0, 0, ANIM_W, ANIM_H, 16, '#0d1117', '#0a0e14');
+
+  // Neon border.
+  roundRect(ctx, 0, 0, ANIM_W, ANIM_H, 16);
+  ctx.strokeStyle = accentColor;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Ambient glow.
+  glowCircle(ctx, ANIM_W / 2, ANIM_H / 2, 120, `${accentColor}18`);
+
+  // Player name (top-left).
+  if (playerName) {
+    ctx.fillStyle = '#888899';
+    ctx.font = 'bold 13px Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(playerName, 20, 14);
+  }
+
+  // Title.
+  ctx.fillStyle = accentColor;
+  ctx.font = 'bold 24px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(title, ANIM_W / 2, 40);
+
+  // Optional icon.
+  if (drawIcon) {
+    drawIcon(ctx, ANIM_W / 2, 100);
+  }
+
+  // Status text.
+  const statusY = drawIcon ? 140 : 95;
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 28px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(status, ANIM_W / 2, statusY);
+
+  // Subtitle.
+  if (subtitle) {
+    ctx.fillStyle = '#666688';
+    ctx.font = '14px Arial, sans-serif';
+    ctx.fillText(subtitle, ANIM_W / 2, statusY + 30);
+  }
+
+  return canvas.toBuffer('image/png');
+}
+
+/**
+ * Coinflip animation: shows a spinning coin icon with "Flipping . . ."
+ */
+function renderCoinflipAnim({ playerName = '', choice = '' } = {}) {
+  return renderAnimationFrame({
+    title: 'C O I N F L I P',
+    status: 'Flipping . . .',
+    accentColor: '#ffd700',
+    playerName,
+    subtitle: choice ? `Picked ${choice.toUpperCase()}` : '',
+    drawIcon: (ctx, cx, cy) => {
+      // Spinning coin (ellipse to suggest rotation).
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 28, 22, 0, 0, Math.PI * 2);
+      const coinGrad = ctx.createRadialGradient(cx - 5, cy - 5, 2, cx, cy, 28);
+      coinGrad.addColorStop(0, '#fff8dc');
+      coinGrad.addColorStop(0.5, '#ffd700');
+      coinGrad.addColorStop(1, '#b8860b');
+      ctx.fillStyle = coinGrad;
+      ctx.fill();
+      ctx.strokeStyle = '#8b6914';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // Question mark.
+      ctx.fillStyle = '#6b4e0a';
+      ctx.font = 'bold 24px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('?', cx, cy);
+    },
+  });
+}
+
+/**
+ * Slots animation: shows slot reels with "Rolling . . ."
+ */
+function renderSlotsAnim({ playerName = '' } = {}) {
+  return renderAnimationFrame({
+    title: 'S L O T   M A C H I N E',
+    status: 'Rolling . . .',
+    accentColor: '#9b59b6',
+    playerName,
+    drawIcon: (ctx, cx, cy) => {
+      // Three reel boxes with question marks.
+      const reelW = 44;
+      const reelH = 44;
+      const gap = 14;
+      const totalW = 3 * reelW + 2 * gap;
+      const startX = cx - totalW / 2;
+      for (let i = 0; i < 3; i++) {
+        const rx = startX + i * (reelW + gap);
+        const ry = cy - reelH / 2;
+        roundRect(ctx, rx, ry, reelW, reelH, 8);
+        ctx.fillStyle = '#0d0d1a';
+        ctx.fill();
+        ctx.strokeStyle = '#9b59b6';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = '#9b59b6';
+        ctx.font = 'bold 22px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('?', rx + reelW / 2, cy);
+      }
+    },
+  });
+}
+
+/**
+ * Crash animation: shows a rocket icon with "Launching . . ."
+ */
+function renderCrashAnim({ playerName = '', cashout = 0 } = {}) {
+  return renderAnimationFrame({
+    title: 'C R A S H',
+    status: 'Launching . . .',
+    accentColor: '#ff6b35',
+    playerName,
+    subtitle: cashout ? `Target: ${cashout}x` : '',
+    drawIcon: (ctx, cx, cy) => {
+      // Rocket triangle.
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 22);
+      ctx.lineTo(cx - 14, cy + 16);
+      ctx.lineTo(cx + 14, cy + 16);
+      ctx.closePath();
+      const rocketGrad = ctx.createLinearGradient(cx, cy - 22, cx, cy + 16);
+      rocketGrad.addColorStop(0, '#ff6b35');
+      rocketGrad.addColorStop(1, '#ff3366');
+      ctx.fillStyle = rocketGrad;
+      ctx.fill();
+      // Flame.
+      ctx.beginPath();
+      ctx.moveTo(cx - 8, cy + 16);
+      ctx.lineTo(cx, cy + 30);
+      ctx.lineTo(cx + 8, cy + 16);
+      ctx.closePath();
+      ctx.fillStyle = '#ffd700';
+      ctx.fill();
+    },
+  });
+}
+
+/**
+ * Dice animation: shows a die icon with "Rolling . . ."
+ */
+function renderDiceAnim({ playerName = '', direction = '', target = 0 } = {}) {
+  return renderAnimationFrame({
+    title: 'D I C E',
+    status: 'Rolling . . .',
+    accentColor: '#3498db',
+    playerName,
+    subtitle: direction && target ? `${direction.toUpperCase()} ${target}` : '',
+    drawIcon: (ctx, cx, cy) => {
+      // Die face.
+      const size = 44;
+      roundRect(ctx, cx - size / 2, cy - size / 2, size, size, 8);
+      const dieGrad = ctx.createLinearGradient(cx, cy - size / 2, cx, cy + size / 2);
+      dieGrad.addColorStop(0, '#2a2a3e');
+      dieGrad.addColorStop(1, '#1a1a2e');
+      ctx.fillStyle = dieGrad;
+      ctx.fill();
+      ctx.strokeStyle = '#3498db';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // Question mark.
+      ctx.fillStyle = '#e0e0e0';
+      ctx.font = 'bold 24px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('?', cx, cy);
+    },
+  });
+}
+
+/**
+ * Roulette animation: shows a wheel icon with "Spinning . . ."
+ */
+function renderRouletteAnim({ playerName = '', betLabel = '' } = {}) {
+  return renderAnimationFrame({
+    title: 'R O U L E T T E',
+    status: 'Spinning . . .',
+    accentColor: '#2e7d32',
+    playerName,
+    subtitle: betLabel ? `Bet: ${betLabel}` : '',
+    drawIcon: (ctx, cx, cy) => {
+      // Simplified wheel circle.
+      const r = 26;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      const wheelGrad = ctx.createRadialGradient(cx, cy, 4, cx, cy, r);
+      wheelGrad.addColorStop(0, '#333333');
+      wheelGrad.addColorStop(1, '#1a1a1a');
+      ctx.fillStyle = wheelGrad;
+      ctx.fill();
+      // Colored segments (simplified).
+      const colors = ['#e53935', '#212121', '#2e7d32', '#212121', '#e53935', '#212121'];
+      const segAngle = (Math.PI * 2) / colors.length;
+      for (let i = 0; i < colors.length; i++) {
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, r - 2, i * segAngle, (i + 1) * segAngle);
+        ctx.closePath();
+        ctx.fillStyle = colors[i];
+        ctx.fill();
+      }
+      // Center hub.
+      ctx.beginPath();
+      ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#555555';
+      ctx.fill();
+    },
+  });
+}
+
+/**
+ * Plinko animation: shows a ball icon with "Dropping . . ."
+ */
+function renderPlinkoAnim({ playerName = '' } = {}) {
+  return renderAnimationFrame({
+    title: 'P L I N K O',
+    status: 'Dropping . . .',
+    accentColor: '#ff9900',
+    playerName,
+    drawIcon: (ctx, cx, cy) => {
+      // Pegs.
+      const pegR = 4;
+      const positions = [
+        [cx - 24, cy - 12], [cx, cy - 12], [cx + 24, cy - 12],
+        [cx - 12, cy + 4], [cx + 12, cy + 4],
+        [cx - 24, cy + 20], [cx, cy + 20], [cx + 24, cy + 20],
+      ];
+      for (const [px, py] of positions) {
+        ctx.beginPath();
+        ctx.arc(px, py, pegR, 0, Math.PI * 2);
+        ctx.fillStyle = '#555577';
+        ctx.fill();
+      }
+      // Ball at top.
+      ctx.beginPath();
+      ctx.arc(cx, cy - 28, 7, 0, Math.PI * 2);
+      const ballGrad = ctx.createRadialGradient(cx - 2, cy - 30, 1, cx, cy - 28, 7);
+      ballGrad.addColorStop(0, '#fff8dc');
+      ballGrad.addColorStop(1, '#ffd700');
+      ctx.fillStyle = ballGrad;
+      ctx.fill();
+    },
+  });
+}
+
+/**
+ * Wheel animation: shows a wheel icon with "Spinning . . ."
+ */
+function renderWheelAnim({ playerName = '' } = {}) {
+  return renderAnimationFrame({
+    title: 'W H E E L',
+    status: 'Spinning . . .',
+    accentColor: '#e91e63',
+    playerName,
+    drawIcon: (ctx, cx, cy) => {
+      // Simplified wheel.
+      const r = 26;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r + 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#444444';
+      ctx.fill();
+      const segColors = ['#1565c0', '#2e7d32', '#e65100', '#6a1b9a', '#b71c1c', '#424242'];
+      const segAngle = (Math.PI * 2) / segColors.length;
+      for (let i = 0; i < segColors.length; i++) {
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, r, i * segAngle, (i + 1) * segAngle);
+        ctx.closePath();
+        ctx.fillStyle = segColors[i];
+        ctx.fill();
+      }
+      // Hub.
+      ctx.beginPath();
+      ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+      ctx.fillStyle = '#555555';
+      ctx.fill();
+      // Pointer.
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - r - 8);
+      ctx.lineTo(cx - 6, cy - r - 16);
+      ctx.lineTo(cx + 6, cy - r - 16);
+      ctx.closePath();
+      ctx.fillStyle = '#ffd700';
+      ctx.fill();
+    },
+  });
+}
+
+/**
+ * Blackjack dealing animation: shows cards being dealt with "Dealing . . ."
+ */
+function renderBlackjackAnim({ playerName = '' } = {}) {
+  return renderAnimationFrame({
+    title: 'B L A C K J A C K',
+    status: 'Dealing . . .',
+    accentColor: '#1a6b3c',
+    playerName,
+    drawIcon: (ctx, cx, cy) => {
+      // Two overlapping card backs.
+      const cw = 36;
+      const ch = 50;
+      for (let i = 0; i < 2; i++) {
+        const ox = cx - 24 + i * 20;
+        const oy = cy - ch / 2 + i * 4;
+        roundRect(ctx, ox, oy, cw, ch, 6);
+        const cardGrad = ctx.createLinearGradient(ox, oy, ox, oy + ch);
+        cardGrad.addColorStop(0, '#3a6fc4');
+        cardGrad.addColorStop(1, '#2c5aa0');
+        ctx.fillStyle = cardGrad;
+        ctx.fill();
+        ctx.strokeStyle = '#1a3a6b';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        // Inner diamond.
+        const dcx = ox + cw / 2;
+        const dcy = oy + ch / 2;
+        ctx.fillStyle = '#1e3f73';
+        ctx.beginPath();
+        ctx.moveTo(dcx, dcy - 8);
+        ctx.lineTo(dcx + 8, dcy);
+        ctx.lineTo(dcx, dcy + 8);
+        ctx.lineTo(dcx - 8, dcy);
+        ctx.closePath();
+        ctx.fill();
+      }
+    },
+  });
+}
+
 module.exports = {
   renderBlackjackTable,
   renderCoinflip,
@@ -2577,4 +2952,13 @@ module.exports = {
   renderMines,
   renderPlinko,
   renderWheel,
+  renderAnimationFrame,
+  renderCoinflipAnim,
+  renderSlotsAnim,
+  renderCrashAnim,
+  renderDiceAnim,
+  renderRouletteAnim,
+  renderPlinkoAnim,
+  renderWheelAnim,
+  renderBlackjackAnim,
 };
