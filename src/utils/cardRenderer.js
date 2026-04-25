@@ -1,25 +1,22 @@
 const { createCanvas } = require('@napi-rs/canvas');
 
 // ─── Layout Constants ───────────────────────────────────────────────────────
-const CARD_W = 80;
-const CARD_H = 112;
-const CARD_RADIUS = 8;
-const CARD_GAP = 12;
-const HAND_PADDING = 24;
-const LABEL_HEIGHT = 28;
-const SECTION_GAP = 18;
+const CARD_W = 100;
+const CARD_H = 140;
+const CARD_RADIUS = 10;
+const CARD_GAP = 14;
+const HAND_PADDING = 32;
+const LABEL_HEIGHT = 36;
+const SECTION_GAP = 28;
 
 // ─── Color Palette ──────────────────────────────────────────────────────────
-const TABLE_COLOR = '#1a6b3c';
-const TABLE_BORDER = '#145a30';
 const CARD_BG = '#ffffff';
-const CARD_BORDER = '#cccccc';
+const CARD_BORDER = '#d0d0d0';
 const CARD_BACK = '#2c5aa0';
 const CARD_BACK_PATTERN = '#1e3f73';
-const RED = '#d32f2f';
+const RED = '#e53935';
 const BLACK = '#1a1a1a';
-const LABEL_COLOR = '#e0e0e0';
-const VALUE_BG = 'rgba(0, 0, 0, 0.55)';
+const VALUE_BG = 'rgba(0, 0, 0, 0.65)';
 const VALUE_COLOR = '#ffffff';
 
 // ─── Suit Symbols ───────────────────────────────────────────────────────────
@@ -61,6 +58,11 @@ function roundRect(ctx, x, y, w, h, r) {
  * @param {{ rank: string, suit: string }} card
  */
 function drawCard(ctx, x, y, card) {
+  // Card shadow.
+  roundRect(ctx, x + 3, y + 3, CARD_W, CARD_H, CARD_RADIUS);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+  ctx.fill();
+
   // Card body.
   roundRect(ctx, x, y, CARD_W, CARD_H, CARD_RADIUS);
   ctx.fillStyle = CARD_BG;
@@ -73,31 +75,31 @@ function drawCard(ctx, x, y, card) {
   ctx.fillStyle = suitInfo.color;
 
   // Top-left rank.
-  ctx.font = 'bold 18px Arial, sans-serif';
+  ctx.font = 'bold 22px Arial, sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText(card.rank, x + 6, y + 5);
+  ctx.fillText(card.rank, x + 8, y + 6);
 
   // Top-left suit (small).
-  ctx.font = '14px Arial, sans-serif';
-  ctx.fillText(suitInfo.symbol, x + 7, y + 24);
+  ctx.font = '16px Arial, sans-serif';
+  ctx.fillText(suitInfo.symbol, x + 9, y + 28);
 
   // Center suit (large).
-  ctx.font = '36px Arial, sans-serif';
+  ctx.font = '46px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(suitInfo.symbol, x + CARD_W / 2, y + CARD_H / 2);
 
   // Bottom-right rank (rotated).
   ctx.save();
-  ctx.translate(x + CARD_W - 6, y + CARD_H - 5);
+  ctx.translate(x + CARD_W - 8, y + CARD_H - 6);
   ctx.rotate(Math.PI);
-  ctx.font = 'bold 18px Arial, sans-serif';
+  ctx.font = 'bold 22px Arial, sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.fillText(card.rank, 0, 0);
-  ctx.font = '14px Arial, sans-serif';
-  ctx.fillText(suitInfo.symbol, 1, 19);
+  ctx.font = '16px Arial, sans-serif';
+  ctx.fillText(suitInfo.symbol, 1, 22);
   ctx.restore();
 }
 
@@ -108,26 +110,34 @@ function drawCard(ctx, x, y, card) {
  * @param {number} y
  */
 function drawCardBack(ctx, x, y) {
-  // Card body.
+  // Card shadow.
+  roundRect(ctx, x + 3, y + 3, CARD_W, CARD_H, CARD_RADIUS);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+  ctx.fill();
+
+  // Card body with gradient.
   roundRect(ctx, x, y, CARD_W, CARD_H, CARD_RADIUS);
-  ctx.fillStyle = CARD_BACK;
+  const backGrad = ctx.createLinearGradient(x, y, x, y + CARD_H);
+  backGrad.addColorStop(0, '#3a6fc4');
+  backGrad.addColorStop(1, CARD_BACK);
+  ctx.fillStyle = backGrad;
   ctx.fill();
   ctx.strokeStyle = '#1a3a6b';
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
   // Inner border.
-  const inset = 5;
+  const inset = 6;
   roundRect(ctx, x + inset, y + inset, CARD_W - inset * 2, CARD_H - inset * 2, CARD_RADIUS - 2);
   ctx.strokeStyle = CARD_BACK_PATTERN;
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  // Diamond pattern.
+  // Diamond pattern (larger).
   ctx.fillStyle = CARD_BACK_PATTERN;
   const cx = x + CARD_W / 2;
   const cy = y + CARD_H / 2;
-  const size = 12;
+  const size = 16;
   ctx.beginPath();
   ctx.moveTo(cx, cy - size);
   ctx.lineTo(cx + size, cy);
@@ -136,9 +146,22 @@ function drawCardBack(ctx, x, y) {
   ctx.closePath();
   ctx.fill();
 
+  // Smaller diamonds around center.
+  const smallSize = 6;
+  const offsets = [[-20, -20], [20, -20], [-20, 20], [20, 20]];
+  for (const [dx, dy] of offsets) {
+    ctx.beginPath();
+    ctx.moveTo(cx + dx, cy + dy - smallSize);
+    ctx.lineTo(cx + dx + smallSize, cy + dy);
+    ctx.lineTo(cx + dx, cy + dy + smallSize);
+    ctx.lineTo(cx + dx - smallSize, cy + dy);
+    ctx.closePath();
+    ctx.fill();
+  }
+
   // Question mark.
-  ctx.fillStyle = '#6b9fd3';
-  ctx.font = 'bold 28px Arial, sans-serif';
+  ctx.fillStyle = '#8bb8e8';
+  ctx.font = 'bold 36px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('?', cx, cy);
@@ -151,18 +174,27 @@ function drawCardBack(ctx, x, y) {
  * @param {number} y
  * @param {string} text - The value text (e.g. "21" or "?").
  */
-function drawValueBadge(ctx, x, y, text) {
-  const padding = 8;
-  ctx.font = 'bold 16px Arial, sans-serif';
+function drawValueBadge(ctx, x, y, text, glowColor) {
+  const padding = 12;
+  ctx.font = 'bold 20px Arial, sans-serif';
   const metrics = ctx.measureText(text);
-  const badgeW = metrics.width + padding * 2;
-  const badgeH = 24;
+  const badgeW = Math.max(metrics.width + padding * 2, 40);
+  const badgeH = 32;
+
+  // Glow behind badge.
+  if (glowColor) {
+    glowCircle(ctx, x + badgeW / 2, y + badgeH / 2, badgeH, glowColor);
+  }
 
   roundRect(ctx, x, y, badgeW, badgeH, badgeH / 2);
   ctx.fillStyle = VALUE_BG;
   ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
 
   ctx.fillStyle = VALUE_COLOR;
+  ctx.font = 'bold 20px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(text, x + badgeW / 2, y + badgeH / 2);
@@ -196,50 +228,77 @@ function renderBlackjackTable({
   dealerValue,
   showDealer = false,
   playerName = 'Player',
+  outcome = null,
 }) {
+  // Extra width for the value badge next to cards.
+  const BADGE_SPACE = 60;
   // Calculate canvas dimensions.
-  const maxCards = Math.max(playerHand.length, dealerHand.length);
-  const contentW = handWidth(maxCards);
-  const canvasW = contentW + HAND_PADDING * 2;
+  const maxCards = Math.max(playerHand.length, dealerHand.length, 2);
+  const contentW = handWidth(maxCards) + BADGE_SPACE;
+  const canvasW = Math.max(contentW + HAND_PADDING * 2, 380);
   const canvasH =
     HAND_PADDING +          // top padding
-    LABEL_HEIGHT +          // "Dealer (value)" label
+    LABEL_HEIGHT +          // "Dealer" label
     CARD_H +                // dealer cards
     SECTION_GAP +           // gap between hands
-    LABEL_HEIGHT +          // "Player (value)" label
+    LABEL_HEIGHT +          // "Player" label
     CARD_H +                // player cards
     HAND_PADDING;           // bottom padding
 
   const canvas = createCanvas(canvasW, canvasH);
   const ctx = canvas.getContext('2d');
 
-  // ── Table background ──
-  roundRect(ctx, 0, 0, canvasW, canvasH, 12);
-  ctx.fillStyle = TABLE_COLOR;
-  ctx.fill();
-  ctx.strokeStyle = TABLE_BORDER;
-  ctx.lineWidth = 3;
+  // ── Dark gradient background (neon casino style) ──
+  gradientRect(ctx, 0, 0, canvasW, canvasH, 14, '#0a1a10', '#0d1117');
+
+  // Neon border based on outcome.
+  let borderColor = '#1a6b3c';
+  if (outcome === 'win' || outcome === 'blackjack') borderColor = '#00ff88';
+  else if (outcome === 'lose' || outcome === 'bust') borderColor = '#ff3366';
+  else if (outcome === 'push') borderColor = '#ff9900';
+
+  roundRect(ctx, 0, 0, canvasW, canvasH, 14);
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 2.5;
   ctx.stroke();
 
-  // Subtle felt texture lines.
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+  // Ambient glow in the center.
+  glowCircle(ctx, canvasW / 2, canvasH / 2, canvasH * 0.6,
+    'rgba(26, 107, 60, 0.08)');
+
+  // Subtle horizontal felt lines.
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
   ctx.lineWidth = 1;
-  for (let i = 0; i < canvasH; i += 4) {
+  for (let i = 0; i < canvasH; i += 5) {
     ctx.beginPath();
     ctx.moveTo(0, i);
     ctx.lineTo(canvasW, i);
     ctx.stroke();
   }
 
+  // Separator line between dealer and player.
+  const sepY = HAND_PADDING + LABEL_HEIGHT + CARD_H + SECTION_GAP / 2;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(HAND_PADDING, sepY);
+  ctx.lineTo(canvasW - HAND_PADDING, sepY);
+  ctx.stroke();
+
   let cursorY = HAND_PADDING;
 
   // ── Dealer label ──
-  const dealerLabel = `Dealer (${dealerValue})`;
-  ctx.fillStyle = LABEL_COLOR;
-  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.fillStyle = '#ff6b6b';
+  ctx.font = 'bold 18px Arial, sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText(dealerLabel, HAND_PADDING, cursorY);
+  ctx.fillText('DEALER', HAND_PADDING, cursorY + 2);
+
+  // Show dealer value next to label.
+  const dealerLabelVal = showDealer ? String(dealerValue) : String(dealerValue);
+  ctx.fillStyle = '#aaaacc';
+  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.fillText(`  ${dealerLabelVal}`, HAND_PADDING + ctx.measureText('DEALER').width + 4, cursorY + 4);
   cursorY += LABEL_HEIGHT;
 
   // ── Dealer cards ──
@@ -252,19 +311,26 @@ function renderBlackjackTable({
     }
   }
 
-  // Dealer value badge (right of last card).
-  const dealerBadgeX = HAND_PADDING + dealerHand.length * (CARD_W + CARD_GAP) + 4;
-  drawValueBadge(ctx, dealerBadgeX, cursorY + CARD_H / 2 - 12, String(dealerValue));
+  // Dealer value badge (right of last card) with glow.
+  const dealerBadgeX = HAND_PADDING + dealerHand.length * (CARD_W + CARD_GAP) + 8;
+  const dealerGlow = showDealer ? 'rgba(255, 107, 107, 0.2)' : null;
+  drawValueBadge(ctx, dealerBadgeX, cursorY + CARD_H / 2 - 16, String(dealerValue), dealerGlow);
 
   cursorY += CARD_H + SECTION_GAP;
 
   // ── Player label ──
-  const playerLabel = `${playerName} (${playerValue})`;
-  ctx.fillStyle = LABEL_COLOR;
-  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.fillStyle = '#00e5ff';
+  ctx.font = 'bold 18px Arial, sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText(playerLabel, HAND_PADDING, cursorY);
+  const displayName = playerName.length > 14 ? playerName.substring(0, 14) + '..' : playerName;
+  ctx.fillText(displayName.toUpperCase(), HAND_PADDING, cursorY + 2);
+
+  // Show player value next to label.
+  ctx.fillStyle = '#aaaacc';
+  ctx.font = 'bold 16px Arial, sans-serif';
+  const nameWidth = ctx.measureText(displayName.toUpperCase()).width;
+  ctx.fillText(`  ${playerValue}`, HAND_PADDING + nameWidth + 4, cursorY + 4);
   cursorY += LABEL_HEIGHT;
 
   // ── Player cards ──
@@ -273,9 +339,10 @@ function renderBlackjackTable({
     drawCard(ctx, cardX, cursorY, playerHand[i]);
   }
 
-  // Player value badge.
-  const playerBadgeX = HAND_PADDING + playerHand.length * (CARD_W + CARD_GAP) + 4;
-  drawValueBadge(ctx, playerBadgeX, cursorY + CARD_H / 2 - 12, String(playerValue));
+  // Player value badge with glow.
+  const playerBadgeX = HAND_PADDING + playerHand.length * (CARD_W + CARD_GAP) + 8;
+  const playerGlowColor = playerValue === 21 ? 'rgba(255, 215, 0, 0.3)' : 'rgba(0, 229, 255, 0.2)';
+  drawValueBadge(ctx, playerBadgeX, cursorY + CARD_H / 2 - 16, String(playerValue), playerGlowColor);
 
   return canvas.toBuffer('image/png');
 }
