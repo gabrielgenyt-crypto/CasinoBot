@@ -29,7 +29,7 @@ const SIMPLE_GAMES = [
   { value: 'scratch', label: 'Scratch Card', emoji: '\uD83C\uDF9F', description: 'Match 3 symbols to win' },
   { value: 'coinflip', label: 'Coinflip', emoji: '\uD83E\uDE99', description: '50/50 heads or tails' },
   { value: 'wheel', label: 'Wheel', emoji: '\uD83C\uDFA1', description: 'Spin the wheel of fortune' },
-  { value: 'hilo', label: 'Hi-Lo', emoji: '\uD83C\uDCA0', description: 'Higher or lower card game' },
+  { value: 'hilo', label: 'Hi-Lo', emoji: '\uD83C\uDFB4', description: 'Higher or lower card game' },
   { value: 'russianroulette', label: 'Russian Roulette', emoji: '\uD83D\uDD2B', description: 'Last one standing wins' },
 ];
 
