@@ -7,6 +7,7 @@ const {
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
+const { formatAmount, formatBalance } = require('../utils/formatAmount');
 const { renderSlots, renderSlotsAnim } = require('../utils/cardRenderer');
 
 const data = new SlashCommandBuilder()
@@ -25,7 +26,7 @@ async function execute(interaction) {
 
   if (bet > balance) {
     return interaction.reply({
-      content: `❌ Insufficient funds. Your balance: **${balance.toLocaleString()}** coins`,
+      content: `❌ Insufficient funds. Your balance: **${formatAmount(balance)}**`,
       ephemeral: true,
     });
   }
@@ -84,7 +85,7 @@ async function execute(interaction) {
   }
 
   if (result.won) {
-    description += `**+${result.payout.toLocaleString()}** coins`;
+    description += `**+${formatAmount(result.payout)}**`;
     if (result.paylineWins.length > 0) {
       description += ` across **${result.paylineWins.length}** payline${result.paylineWins.length !== 1 ? 's' : ''}`;
     }
@@ -95,14 +96,14 @@ async function execute(interaction) {
   // Progressive jackpot win.
   if (result.jackpotWin) {
     description += `\n\n${EMOJIS.fire} **PROGRESSIVE JACKPOT!** ${EMOJIS.fire}`;
-    description += `\n${EMOJIS.coin} Jackpot prize: **+${result.jackpotWin.amount.toLocaleString()}** coins`;
+    description += `\n${EMOJIS.coin} Jackpot prize: **+${formatAmount(result.jackpotWin.amount)}**`;
   }
 
   // Free spins info.
   if (result.freeSpinResult) {
     const fs = result.freeSpinResult;
     description += `\n\n💫 **${fs.spinResults.length} Free Spins** triggered!`;
-    description += `\n${EMOJIS.coin} Free spin winnings: **+${fs.totalWin.toLocaleString()}** coins`;
+    description += `\n${EMOJIS.coin} Free spin winnings: **+${formatAmount(fs.totalWin)}**`;
   }
 
   if (result.isJackpot || result.isMegaWin) {
@@ -131,7 +132,7 @@ async function execute(interaction) {
     .setColor(color)
     .setImage('attachment://slots.png')
     .addFields(
-      { name: `${EMOJIS.coin} Balance`, value: `\`${result.newBalance.toLocaleString()}\``, inline: true },
+      { name: `${EMOJIS.coin} Balance`, value: `\`${formatBalance(result.newBalance)}\``, inline: true },
       { name: '🔢 Nonce', value: `\`${result.nonce}\``, inline: true },
       { name: `${EMOJIS.shield} Seed`, value: `\`${result.serverSeedHash.substring(0, 12)}...\``, inline: true }
     )

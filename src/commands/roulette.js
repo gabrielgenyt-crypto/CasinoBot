@@ -6,6 +6,7 @@ const {
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
+const { formatAmount, formatBalance } = require('../utils/formatAmount');
 const { renderRoulette, renderRouletteAnim } = require('../utils/cardRenderer');
 
 // Build choices from BET_TYPES plus a few number examples.
@@ -49,7 +50,7 @@ async function execute(interaction) {
 
   if (bet > balance) {
     return interaction.reply({
-      content: `❌ Insufficient funds. Your balance: **${balance.toLocaleString()}** coins`,
+      content: `❌ Insufficient funds. Your balance: **${formatAmount(balance)}**`,
       ephemeral: true,
     });
   }
@@ -103,13 +104,13 @@ async function execute(interaction) {
     .setTitle(`${EMOJIS.roulette}  ${colorEmoji[result.color] || '⚪'} ${result.number}  ${EMOJIS.roulette}`)
     .setDescription(
       result.won
-        ? `**+${result.payout.toLocaleString()}** coins -- bet on **${result.betLabel}**`
+        ? `**+${formatAmount(result.payout)}** -- bet on **${result.betLabel}**`
         : `Landed on **${result.number}** (${result.color}) -- bet was **${result.betLabel}**`
     )
     .setColor(color)
     .setImage('attachment://roulette.png')
     .addFields(
-      { name: `${EMOJIS.coin} Balance`, value: `\`${result.newBalance.toLocaleString()}\``, inline: true },
+      { name: `${EMOJIS.coin} Balance`, value: `\`${formatBalance(result.newBalance)}\``, inline: true },
       { name: '🔢 Nonce', value: `\`${result.nonce}\``, inline: true },
       { name: `${EMOJIS.shield} Seed`, value: `\`${result.serverSeedHash.substring(0, 12)}...\``, inline: true }
     )

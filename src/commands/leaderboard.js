@@ -2,6 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discor
 const db = require('../utils/database');
 const { COLORS } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
+const { formatAmount } = require('../utils/formatAmount');
 const { renderLeaderboard } = require('../utils/cardRenderer');
 
 const data = new SlashCommandBuilder()
@@ -49,7 +50,7 @@ async function execute(interaction) {
       .prepare('SELECT user_id, balance FROM wallets ORDER BY balance DESC LIMIT 10')
       .all();
     title = 'TOP 10 — RICHEST PLAYERS';
-    valueKey = (row) => `${row.balance.toLocaleString()} coins`;
+    valueKey = (row) => formatAmount(row.balance);
     break;
 
   case 'wagered':
@@ -71,7 +72,7 @@ async function execute(interaction) {
     title = 'TOP 10 — HIGHEST PROFIT';
     valueKey = (row) => {
       const sign = row.net_profit >= 0 ? '+' : '';
-      return `${sign}${row.net_profit.toLocaleString()} coins`;
+      return `${sign}${formatAmount(row.net_profit)}`;
     };
     break;
 

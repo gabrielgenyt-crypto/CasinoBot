@@ -3,6 +3,7 @@ const { ensureWallet } = require('../utils/wallet');
 const { getJackpotPool, getJackpotHistory } = require('../utils/jackpot');
 const { COLORS } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
+const { formatAmount } = require('../utils/formatAmount');
 
 const data = new SlashCommandBuilder()
   .setName('jackpot')
@@ -23,7 +24,7 @@ async function execute(interaction) {
 
   // Current pool.
   let description = `### ${EMOJIS.coin} Current Pool\n`;
-  description += `# **${pool.amount.toLocaleString()}** coins\n\n`;
+  description += `# **${formatAmount(pool.amount)}**\n\n`;
   description += '> 1% of every bet feeds the jackpot pool.\n';
   description += '> Any **slots** spin can trigger the jackpot!\n';
   description += '> Higher bets = higher chance to win.\n';
@@ -31,7 +32,7 @@ async function execute(interaction) {
   // Last winner.
   if (pool.lastWinnerName) {
     description += `\n### ${EMOJIS.trophy} Last Winner\n`;
-    description += `**${pool.lastWinnerName}** won **${pool.lastWinAmount.toLocaleString()}** coins`;
+    description += `**${pool.lastWinnerName}** won **${formatAmount(pool.lastWinAmount)}**`;
     if (pool.lastWonAt) {
       description += ` on ${pool.lastWonAt}`;
     }
@@ -50,7 +51,7 @@ async function execute(interaction) {
   // Recent winners history.
   if (history.length > 0) {
     const historyLines = history.map(
-      (h, i) => `**${i + 1}.** ${h.username} -- **${h.amount.toLocaleString()}** coins`
+      (h, i) => `**${i + 1}.** ${h.username} -- **${formatAmount(h.amount)}**`
     );
     embed.addFields({
       name: `${EMOJIS.trophy} Recent Winners`,

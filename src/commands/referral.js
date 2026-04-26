@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { ensureWallet, updateBalance } = require('../utils/wallet');
 const { getReferralRecord, applyReferral, REFERRAL_BONUS } = require('../utils/referral');
+const { formatAmount } = require('../utils/formatAmount');
 
 const data = new SlashCommandBuilder()
   .setName('referral')
@@ -33,7 +34,7 @@ async function execute(interaction) {
       .setDescription(
         'Share this code with friends:\n\n' +
         `**\`${record.referral_code}\`**\n\n` +
-        `They use \`/referral use ${record.referral_code}\` and you earn **${REFERRAL_BONUS}** coins per referral!`
+        `They use \`/referral use ${record.referral_code}\` and you earn **${formatAmount(REFERRAL_BONUS)}** per referral!`
       )
       .setColor(0x3498db);
 
@@ -62,8 +63,8 @@ async function execute(interaction) {
       .setTitle('Referral Applied!')
       .setDescription(
         `You used <@${result.referrerId}>'s referral code.\n` +
-        `You received **${welcomeBonus}** coins as a welcome bonus!\n` +
-        `Your referrer received **${result.bonus}** coins.`
+        `You received **${formatAmount(welcomeBonus)}** as a welcome bonus!\n` +
+        `Your referrer received **${formatAmount(result.bonus)}**.`
       )
       .setColor(0x2ecc71);
 
@@ -79,7 +80,7 @@ async function execute(interaction) {
       .addFields(
         { name: 'Your Code', value: `\`${record.referral_code}\``, inline: true },
         { name: 'Referrals', value: `${record.referral_count}`, inline: true },
-        { name: 'Earnings', value: `${record.referral_earnings} coins`, inline: true },
+        { name: 'Earnings', value: formatAmount(record.referral_earnings), inline: true },
         { name: 'Referred By', value: record.referred_by ? `<@${record.referred_by}>` : 'None', inline: true }
       );
 

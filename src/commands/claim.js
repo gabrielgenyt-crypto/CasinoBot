@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const db = require('../utils/database');
 const { ensureWallet, updateBalance } = require('../utils/wallet');
+const { formatAmount, formatBalance } = require('../utils/formatAmount');
 
 const data = new SlashCommandBuilder()
   .setName('claim')
@@ -45,9 +46,9 @@ async function execute(interaction) {
 
   const embed = new EmbedBuilder()
     .setTitle('Promo Code Redeemed!')
-    .setDescription(`You received **${promo.amount}** coins from code **${code}**`)
+    .setDescription(`You received **${formatAmount(promo.amount)}** from code **${code}**`)
     .setColor(0x2ecc71)
-    .addFields({ name: 'New Balance', value: `${newBalance}`, inline: true })
+    .addFields({ name: 'New Balance', value: formatBalance(newBalance), inline: true })
     .setTimestamp();
 
   return interaction.reply({ embeds: [embed] });

@@ -8,7 +8,7 @@ const { renderBalance } = require('../utils/cardRenderer');
 
 const data = new SlashCommandBuilder()
   .setName('balance')
-  .setDescription('Check your current coin balance and wallet overview.');
+  .setDescription('Check your current balance and wallet overview.');
 
 async function execute(interaction) {
   const userId = interaction.user.id;
@@ -67,7 +67,7 @@ async function execute(interaction) {
             : COLORS.info
     )
     .setImage('attachment://balance.png')
-    .setFooter({ text: 'Use /stats for full stats | /daily for free coins' })
+    .setFooter({ text: 'Use /stats for full stats | /daily for free rewards' })
     .setTimestamp();
 
   return interaction.reply({ embeds: [embed], files: [attachment] });

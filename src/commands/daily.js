@@ -3,15 +3,16 @@ const db = require('../utils/database');
 const { ensureWallet, updateBalance } = require('../utils/wallet');
 const { COLORS } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
+// formatAmount available via '../utils/formatAmount' if needed for text displays.
 const { renderReward } = require('../utils/cardRenderer');
 
 const BASE_REWARD = 500;
-const STREAK_BONUS = 100; // Extra coins per streak day.
+const STREAK_BONUS = 100; // Extra coins per streak day (20 EUR).
 const MAX_STREAK_BONUS = 7; // Cap streak multiplier at 7 days.
 
 const data = new SlashCommandBuilder()
   .setName('daily')
-  .setDescription('Claim your daily free coins! Streak bonuses for consecutive days.');
+  .setDescription('Claim your daily free reward! Streak bonuses for consecutive days.');
 
 async function execute(interaction) {
   const userId = interaction.user.id;

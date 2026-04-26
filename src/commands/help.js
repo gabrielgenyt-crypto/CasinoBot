@@ -80,15 +80,15 @@ const CATEGORIES = {
   economy: {
     label: 'Economy & Wallet',
     emoji: '💰',
-    description: 'Manage your coins and finances',
+    description: 'Manage your balance and finances',
     fields: [
       {
         name: `${EMOJIS.coin} /balance`,
-        value: 'Check your current coin balance and wallet overview.',
+        value: 'Check your current balance and wallet overview.',
       },
       {
         name: '📅 /daily',
-        value: 'Claim your free daily coin reward (streak bonuses!).',
+        value: 'Claim your free daily reward (streak bonuses!).',
       },
       {
         name: '📦 /weekly',
@@ -100,7 +100,7 @@ const CATEGORIES = {
       },
       {
         name: `${EMOJIS.money} /tip <user> <amount>`,
-        value: 'Send coins to another player.',
+        value: 'Send funds to another player.',
       },
       {
         name: `${EMOJIS.crypto} /deposit`,
@@ -108,7 +108,7 @@ const CATEGORIES = {
       },
       {
         name: '📤 /withdraw <amount> <address>',
-        value: 'Withdraw coins to your crypto wallet.',
+        value: 'Withdraw funds to your crypto wallet.',
       },
     ],
   },
@@ -135,7 +135,7 @@ const CATEGORIES = {
       },
       {
         name: '🔗 /referral',
-        value: 'Get your referral link and earn bonus coins.',
+        value: 'Get your referral link and earn bonus rewards.',
       },
       {
         name: `${EMOJIS.shield} /fairness`,

@@ -8,6 +8,7 @@ const {
 } = require('../utils/vip');
 const { COLORS } = require('../utils/animations');
 const { renderVip } = require('../utils/cardRenderer');
+const { formatAmount, formatBalance } = require('../utils/formatAmount');
 
 const data = new SlashCommandBuilder()
   .setName('vip')
@@ -70,9 +71,9 @@ async function execute(interaction) {
 
     const embed = new EmbedBuilder()
       .setTitle('VIP Cashback Claimed')
-      .setDescription(`Received **${result.amount}** coins cashback (${(result.level.cashbackRate * 100).toFixed(1)}% rate)`)
+      .setDescription(`Received **${formatAmount(result.amount)}** cashback (${(result.level.cashbackRate * 100).toFixed(1)}% rate)`)
       .setColor(COLORS.win)
-      .addFields({ name: 'New Balance', value: `\`${newBalance.toLocaleString()}\``, inline: true })
+      .addFields({ name: 'New Balance', value: `\`${formatBalance(newBalance)}\``, inline: true })
       .setTimestamp();
 
     return interaction.reply({ embeds: [embed] });

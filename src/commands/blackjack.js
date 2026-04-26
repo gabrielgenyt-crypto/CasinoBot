@@ -22,6 +22,7 @@ const {
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
 const { renderBlackjackTable, renderBlackjackAnim } = require('../utils/cardRenderer');
+const { formatAmount, formatBalance } = require('../utils/formatAmount');
 
 // Active games keyed by userId.
 const activeGames = new Map();
@@ -105,20 +106,20 @@ function buildEmbed(interaction, state, _showDealer = false) {
     switch (state.outcome) {
     case 'blackjack':
       description += `${SPARKLE_LINE}\n`;
-      description += `🎰 **BLACKJACK!** Won **${state.payout.toLocaleString()}** coins!\n`;
+      description += `🎰 **BLACKJACK!** Won **${formatAmount(state.payout)}**!\n`;
       description += SPARKLE_LINE;
       break;
     case 'win':
-      description += `🎉 **YOU WIN!** +**${state.payout.toLocaleString()}** coins\n`;
+      description += `🎉 **YOU WIN!** +**${formatAmount(state.payout)}**\n`;
       break;
     case 'push':
       description += `🤝 **Push.** Bet of **${state.bet.toLocaleString()}** returned.\n`;
       break;
     case 'lose':
-      description += `💀 **Dealer wins.** -**${state.bet.toLocaleString()}** coins\n`;
+      description += `💀 **Dealer wins.** -**${formatAmount(state.bet)}**\n`;
       break;
     case 'bust':
-      description += `💥 **BUST!** -**${state.bet.toLocaleString()}** coins\n`;
+      description += `💥 **BUST!** -**${formatAmount(state.bet)}**\n`;
       break;
     default:
       break;
@@ -138,8 +139,8 @@ function buildEmbed(interaction, state, _showDealer = false) {
 
   if (state.outcome) {
     embed.addFields(
-      { name: `${EMOJIS.coin} Balance`, value: `\`${state.newBalance.toLocaleString()}\``, inline: true },
-      { name: `${EMOJIS.blackjack} Bet`, value: `\`${state.bet.toLocaleString()}\``, inline: true }
+      { name: `${EMOJIS.coin} Balance`, value: `\`${formatBalance(state.newBalance)}\``, inline: true },
+      { name: `${EMOJIS.blackjack} Bet`, value: `\`${formatBalance(state.bet)}\``, inline: true }
     );
     embed.setFooter({ text: `${EMOJIS.shield} Provably Fair | /fairness` });
 
@@ -152,7 +153,7 @@ function buildEmbed(interaction, state, _showDealer = false) {
     }
   } else {
     embed.setFooter({
-      text: `Bet: ${state.bet.toLocaleString()} | Balance: ${getBalance(state.userId).toLocaleString()}`,
+      text: `Bet: ${formatBalance(state.bet)} | Balance: ${formatBalance(getBalance(state.userId))}`,
     });
   }
 
@@ -199,7 +200,7 @@ async function execute(interaction) {
 
   if (bet > balance) {
     return interaction.reply({
-      content: `❌ Insufficient funds. Your balance: **${balance.toLocaleString()}** coins`,
+      content: `❌ Insufficient funds. Your balance: **${formatAmount(balance)}**`,
       ephemeral: true,
     });
   }

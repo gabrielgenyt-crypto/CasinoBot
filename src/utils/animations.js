@@ -1,4 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
+const { formatAmount } = require('./formatAmount');
 
 // ─── Color Palette ──────────────────────────────────────────────────────────
 const COLORS = {
@@ -153,13 +154,13 @@ function winBanner(amount, isJackpot = false) {
     return [
       SPARKLE_LINE,
       '🎰 **J A C K P O T** 🎰',
-      `💰 **+${amount.toLocaleString()} COINS** 💰`,
+      `💰 **+${formatAmount(amount)}** 💰`,
       SPARKLE_LINE,
     ].join('\n');
   }
   return [
     '🎉 **W I N** 🎉',
-    `**+${amount.toLocaleString()} coins**`,
+    `**+${formatAmount(amount)}**`,
   ].join('\n');
 }
 
@@ -169,7 +170,7 @@ function winBanner(amount, isJackpot = false) {
  * @returns {string}
  */
 function lossBanner(amount) {
-  return `💀 **-${amount.toLocaleString()} coins**`;
+  return `💀 **-${formatAmount(amount)}**`;
 }
 
 /**

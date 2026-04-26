@@ -16,6 +16,7 @@ const { COLORS } = require('../utils/animations');
 const { getVipRecord, getLevelForWagered } = require('../utils/vip');
 const { getJackpotPool } = require('../utils/jackpot');
 const EMOJIS = require('../utils/emojis');
+const { formatAmount } = require('../utils/formatAmount');
 const { renderDashboard } = require('../utils/cardRenderer');
 
 // ─── Game Definitions ───────────────────────────────────────────────────────
@@ -361,7 +362,7 @@ async function launchGame(interaction, userId, gameName, betAmount) {
 
   if (betAmount > balance) {
     return interaction.reply({
-      content: `\u274C Insufficient funds. Your balance: **${balance.toLocaleString()}** coins`,
+      content: `\u274C Insufficient funds. Your balance: **${formatAmount(balance)}**`,
       ephemeral: true,
     });
   }

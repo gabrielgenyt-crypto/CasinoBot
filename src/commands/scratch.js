@@ -16,6 +16,7 @@ const {
 } = require('../games/scratch');
 const { COLORS, sleep } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
+const { formatAmount, formatBalance } = require('../utils/formatAmount');
 const { renderScratchCard, renderScratchAnim } = require('../utils/cardRenderer');
 
 // Active scratch cards keyed by userId.
@@ -60,7 +61,7 @@ function buildEmbed(state) {
     const matchLines = state.matches.map(
       (m) => `${m.emoji} ${m.count}x ${m.label} = **${m.multiplier}x**`
     );
-    description = matchLines.join('\n') + `\n\n**+${state.payout.toLocaleString()}** coins`;
+    description = matchLines.join('\n') + `\n\n**+${formatAmount(state.payout)}**`;
   } else if (complete) {
     color = COLORS.lose;
     title = '🎟️  S C R A T C H   C A R D  🎟️';
@@ -80,7 +81,7 @@ function buildEmbed(state) {
 
   if (complete) {
     embed.addFields(
-      { name: `${EMOJIS.coin} Balance`, value: `\`${state.newBalance.toLocaleString()}\``, inline: true },
+      { name: `${EMOJIS.coin} Balance`, value: `\`${formatBalance(state.newBalance)}\``, inline: true },
       { name: '🔢 Nonce', value: `\`${state.nonce}\``, inline: true },
       { name: `${EMOJIS.shield} Seed`, value: `\`${state.serverSeedHash.substring(0, 12)}...\``, inline: true }
     );
@@ -156,7 +157,7 @@ async function execute(interaction) {
 
   if (bet > balance) {
     return interaction.reply({
-      content: `❌ Insufficient funds. Your balance: **${balance.toLocaleString()}** coins`,
+      content: `❌ Insufficient funds. Your balance: **${formatAmount(balance)}**`,
       ephemeral: true,
     });
   }

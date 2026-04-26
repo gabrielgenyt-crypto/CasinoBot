@@ -5,6 +5,7 @@ const {
 } = require('discord.js');
 const db = require('../utils/database');
 const { updateBalance, ensureWallet, getBalance } = require('../utils/wallet');
+const { formatAmount, formatBalance } = require('../utils/formatAmount');
 
 const data = new SlashCommandBuilder()
   .setName('tournament')
@@ -77,7 +78,7 @@ async function execute(interaction) {
       const statusEmoji = t.status === 'active' ? '🟢' : '🟡';
       return (
         `${statusEmoji} **#${t.id} — ${t.name}**\n` +
-        `Game: ${t.game || 'All'} | Fee: ${t.entry_fee} | Prize: ${t.prize_pool} | Players: ${playerCount}/${t.max_players}\n` +
+        `Game: ${t.game || 'All'} | Fee: ${formatBalance(t.entry_fee)} | Prize: ${formatBalance(t.prize_pool)} | Players: ${playerCount}/${t.max_players}\n` +
         `Ends: ${t.ends_at}`
       );
     });
@@ -144,8 +145,8 @@ async function execute(interaction) {
       .setDescription(`You joined **${tournament.name}** (#${tournamentId})`)
       .setColor(0x2ecc71)
       .addFields(
-        { name: 'Entry Fee', value: `${tournament.entry_fee}`, inline: true },
-        { name: 'Prize Pool', value: `${tournament.prize_pool + (tournament.entry_fee || 0)}`, inline: true }
+        { name: 'Entry Fee', value: formatBalance(tournament.entry_fee), inline: true },
+        { name: 'Prize Pool', value: formatBalance(tournament.prize_pool + (tournament.entry_fee || 0)), inline: true }
       );
 
     return interaction.reply({ embeds: [embed] });
@@ -175,7 +176,7 @@ async function execute(interaction) {
       .setTitle(`Tournament #${tournamentId} — ${tournament.name}`)
       .setDescription(lines.join('\n'))
       .setColor(0xf1c40f)
-      .addFields({ name: 'Prize Pool', value: `${tournament.prize_pool} coins`, inline: true })
+      .addFields({ name: 'Prize Pool', value: formatAmount(tournament.prize_pool), inline: true })
       .setFooter({ text: `Status: ${tournament.status} | Ends: ${tournament.ends_at}` });
 
     return interaction.reply({ embeds: [embed] });
@@ -207,8 +208,8 @@ async function execute(interaction) {
         { name: 'ID', value: `#${result.lastInsertRowid}`, inline: true },
         { name: 'Name', value: name, inline: true },
         { name: 'Game', value: game || 'All', inline: true },
-        { name: 'Entry Fee', value: `${entryFee}`, inline: true },
-        { name: 'Prize Pool', value: `${prize}`, inline: true },
+        { name: 'Entry Fee', value: formatBalance(entryFee), inline: true },
+        { name: 'Prize Pool', value: formatBalance(prize), inline: true },
         { name: 'Ends', value: endsAt.toISOString().split('T')[0], inline: true }
       );
 
@@ -251,14 +252,14 @@ async function execute(interaction) {
 
     const payoutLines = payouts.map((p) => {
       const medal = p.place === 1 ? '🥇' : p.place === 2 ? '🥈' : '🥉';
-      return `${medal} <@${p.userId}> — **${p.amount}** coins`;
+      return `${medal} <@${p.userId}> — **${formatAmount(p.amount)}**`;
     });
 
     const embed = new EmbedBuilder()
       .setTitle(`Tournament #${tournamentId} Ended — ${tournament.name}`)
       .setDescription(payoutLines.length > 0 ? payoutLines.join('\n') : 'No participants.')
       .setColor(0xe74c3c)
-      .addFields({ name: 'Total Prize Pool', value: `${tournament.prize_pool}`, inline: true });
+      .addFields({ name: 'Total Prize Pool', value: formatAmount(tournament.prize_pool), inline: true });
 
     return interaction.reply({ embeds: [embed] });
   }

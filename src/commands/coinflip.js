@@ -10,9 +10,11 @@ const { getBalance, ensureWallet } = require('../utils/wallet');
 const { playCoinflip } = require('../games/coinflip');
 const {
   COLORS,
+  DIVIDER,
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
+const { formatAmount, formatBalance } = require('../utils/formatAmount');
 const { renderCoinflip, renderCoinflipAnim } = require('../utils/cardRenderer');
 
 // Temporary store for pending bets (userId -> bet amount).
@@ -42,7 +44,7 @@ async function execute(interaction) {
 
   if (bet > balance) {
     return interaction.reply({
-      content: `❌ Insufficient funds. Your balance: **${balance.toLocaleString()}** coins`,
+      content: `❌ Insufficient funds. Your balance: **${formatAmount(balance)}**`,
       ephemeral: true,
     });
   }
@@ -59,12 +61,12 @@ async function execute(interaction) {
       '     │  ?  │\n' +
       '     ╰─────╯\n' +
       '```\n' +
-      `**${interaction.user.username}** wagered **${bet.toLocaleString()}** coins\n` +
+      `**${interaction.user.username}** wagered **${formatAmount(bet)}**\n` +
       'Pick a side!\n\n' +
       DIVIDER
     )
     .setColor(COLORS.neutral)
-    .setFooter({ text: `Balance: ${balance.toLocaleString()} coins` })
+    .setFooter({ text: `Balance: ${formatBalance(balance)}` })
     .setTimestamp();
 
   const row = new ActionRowBuilder().addComponents(
@@ -114,7 +116,7 @@ async function handleButton(interaction) {
   } catch (error) {
     if (error.message === 'INSUFFICIENT_FUNDS') {
       return interaction.update({
-        content: '❌ You no longer have enough coins for this bet.',
+        content: '❌ You no longer have enough funds for this bet.',
         embeds: [],
         components: [],
       });
@@ -153,13 +155,13 @@ async function handleButton(interaction) {
     .setTitle(`🪙  ${result.side.toUpperCase()}!  🪙`)
     .setDescription(
       result.won
-        ? `**+${result.payout.toLocaleString()}** coins`
+        ? `**+${formatAmount(result.payout)}**`
         : `You picked **${choice.toUpperCase()}** -- better luck next time!`
     )
     .setColor(color)
     .setImage('attachment://coinflip.png')
     .addFields(
-      { name: `${EMOJIS.coin} Balance`, value: `\`${result.newBalance.toLocaleString()}\``, inline: true },
+      { name: `${EMOJIS.coin} Balance`, value: `\`${formatBalance(result.newBalance)}\``, inline: true },
       { name: '🔢 Nonce', value: `\`${result.nonce}\``, inline: true },
       { name: `${EMOJIS.shield} Seed`, value: `\`${result.serverSeedHash.substring(0, 12)}...\``, inline: true }
     )

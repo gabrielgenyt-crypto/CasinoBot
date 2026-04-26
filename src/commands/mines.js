@@ -16,6 +16,7 @@ const {
 } = require('../games/mines');
 const { COLORS } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
+const { formatAmount } = require('../utils/formatAmount');
 const { renderMines } = require('../utils/cardRenderer');
 
 // Active games keyed by userId.
@@ -62,11 +63,11 @@ function buildEmbed(state) {
   if (state.status === 'exploded') {
     color = COLORS.lose;
     title = '💥  M I N E !  💥';
-    description = `**-${state.bet.toLocaleString()}** coins`;
+    description = `**-${formatAmount(state.bet)}**`;
   } else if (state.status === 'cashed_out') {
     color = COLORS.win;
     title = `💎${EMOJIS.coin}  CASHED OUT  ${EMOJIS.coin}💎`;
-    description = `**+${state.payout.toLocaleString()}** coins (${state.multiplier}x)`;
+    description = `**+${formatAmount(state.payout)}** (${state.multiplier}x)`;
   } else {
     color = COLORS.neutral;
     title = '💎  M I N E S  💎';
@@ -99,7 +100,7 @@ async function execute(interaction) {
 
   if (bet > balance) {
     return interaction.reply({
-      content: `❌ Insufficient funds. Your balance: **${balance.toLocaleString()}** coins`,
+      content: `❌ Insufficient funds. Your balance: **${formatAmount(balance)}**`,
       ephemeral: true,
     });
   }
