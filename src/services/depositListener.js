@@ -3,6 +3,7 @@ const express = require('express');
 const db = require('../utils/database');
 const { updateBalance } = require('../utils/wallet');
 const { toUsd, formatUsd } = require('../utils/priceService');
+const { formatAmount } = require('../utils/formatAmount');
 
 /**
  * Deposit listener scaffold. Provides two mechanisms for detecting deposits:
@@ -68,7 +69,7 @@ const creditDeposit = async (userId, chain, token, amount, txHash, discordClient
   // Mark as credited.
   db.prepare('UPDATE pending_deposits SET credited = 1 WHERE tx_hash = ?').run(txHash);
 
-  console.log(`[DEPOSIT] Credited ${coinAmount} coins to ${userId} from ${txHash}`);
+  console.log(`[DEPOSIT] Credited ${coinAmount} coins (~${(coinAmount / 5).toFixed(2)} EUR) to ${userId} from ${txHash}`);
 
   // Send DM notification if Discord client is available.
   if (discordClient) {
@@ -76,7 +77,7 @@ const creditDeposit = async (userId, chain, token, amount, txHash, discordClient
       const user = await discordClient.users.fetch(userId);
       await user.send(
         `Your deposit of **${amount} ${token}** on **${chain}** has been confirmed!\n` +
-        `**${coinAmount}** coins credited. New balance: **${newBalance}**\n` +
+        `**${formatAmount(coinAmount)}** credited. New balance: **${formatAmount(newBalance)}**\n` +
         `TX: \`${txHash}\``
       );
     } catch (_err) {

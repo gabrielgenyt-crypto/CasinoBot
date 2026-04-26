@@ -3,6 +3,7 @@ const { getBalance, ensureWallet } = require('../utils/wallet');
 const { playPlinko } = require('../games/plinko');
 const { COLORS, sleep } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
+const { formatAmount, formatBalance } = require('../utils/formatAmount');
 const { renderPlinko, renderPlinkoAnim } = require('../utils/cardRenderer');
 
 const data = new SlashCommandBuilder()
@@ -21,7 +22,7 @@ async function execute(interaction) {
 
   if (bet > balance) {
     return interaction.reply({
-      content: `❌ Insufficient funds. Your balance: **${balance.toLocaleString()}** coins`,
+      content: `❌ Insufficient funds. Your balance: **${formatAmount(balance)}**`,
       ephemeral: true,
     });
   }
@@ -65,13 +66,13 @@ async function execute(interaction) {
     .setTitle(result.won ? `📍${EMOJIS.coin}  PLINKO WIN  ${EMOJIS.coin}📍` : '📍  P L I N K O  📍')
     .setDescription(
       result.won
-        ? `**+${result.payout.toLocaleString()}** coins (${result.multiplier}x)`
-        : `Landed on **${result.multiplier}x** -- **${result.payout.toLocaleString()}** coins back`
+        ? `**+${formatAmount(result.payout)}** (${result.multiplier}x)`
+        : `Landed on **${result.multiplier}x** -- **${formatAmount(result.payout)}** back`
     )
     .setColor(color)
     .setImage('attachment://plinko.png')
     .addFields(
-      { name: `${EMOJIS.coin} Balance`, value: `\`${result.newBalance.toLocaleString()}\``, inline: true },
+      { name: `${EMOJIS.coin} Balance`, value: `\`${formatBalance(result.newBalance)}\``, inline: true },
       { name: '🔢 Nonce', value: `\`${result.nonce}\``, inline: true },
       { name: `${EMOJIS.shield} Seed`, value: `\`${result.serverSeedHash.substring(0, 12)}...\``, inline: true }
     )

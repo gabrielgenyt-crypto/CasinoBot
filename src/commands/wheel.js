@@ -3,6 +3,7 @@ const { getBalance, ensureWallet } = require('../utils/wallet');
 const { playWheel } = require('../games/wheel');
 const { COLORS, sleep } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
+const { formatAmount, formatBalance } = require('../utils/formatAmount');
 const { renderWheel, renderWheelAnim } = require('../utils/cardRenderer');
 
 const data = new SlashCommandBuilder()
@@ -21,7 +22,7 @@ async function execute(interaction) {
 
   if (bet > balance) {
     return interaction.reply({
-      content: `❌ Insufficient funds. Your balance: **${balance.toLocaleString()}** coins`,
+      content: `❌ Insufficient funds. Your balance: **${formatAmount(balance)}**`,
       ephemeral: true,
     });
   }
@@ -70,13 +71,13 @@ async function execute(interaction) {
     )
     .setDescription(
       result.won
-        ? `**+${result.payout.toLocaleString()}** coins (${result.multiplier}x)`
-        : `Landed on **${result.segment.label}** -- **${result.payout.toLocaleString()}** coins back`
+        ? `**+${formatAmount(result.payout)}** (${result.multiplier}x)`
+        : `Landed on **${result.segment.label}** -- **${formatAmount(result.payout)}** back`
     )
     .setColor(color)
     .setImage('attachment://wheel.png')
     .addFields(
-      { name: `${EMOJIS.coin} Balance`, value: `\`${result.newBalance.toLocaleString()}\``, inline: true },
+      { name: `${EMOJIS.coin} Balance`, value: `\`${formatBalance(result.newBalance)}\``, inline: true },
       { name: '🔢 Nonce', value: `\`${result.nonce}\``, inline: true },
       { name: `${EMOJIS.shield} Seed`, value: `\`${result.serverSeedHash.substring(0, 12)}...\``, inline: true }
     )

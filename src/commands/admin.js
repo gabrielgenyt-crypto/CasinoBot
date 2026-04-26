@@ -2,6 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('disc
 const db = require('../utils/database');
 const { updateBalance, getBalance, ensureWallet } = require('../utils/wallet');
 const { getEntries: getAuditEntries } = require('../utils/auditLog');
+const { formatAmount, formatBalance } = require('../utils/formatAmount');
 
 const data = new SlashCommandBuilder()
   .setName('admin')
@@ -107,7 +108,7 @@ async function execute(interaction) {
         .setDescription(`**${target.username}**'s balance adjusted by **${sign}${amount}**`)
         .setColor(0xf1c40f)
         .addFields(
-          { name: 'New Balance', value: `${newBalance}`, inline: true },
+          { name: 'New Balance', value: formatBalance(newBalance), inline: true },
           { name: 'Reason', value: reason, inline: true }
         )
         .setTimestamp();
@@ -116,7 +117,7 @@ async function execute(interaction) {
     } catch (error) {
       if (error.message === 'INSUFFICIENT_FUNDS') {
         return interaction.reply({
-          content: `Cannot subtract ${Math.abs(amount)} — user only has ${getBalance(target.id)} coins.`,
+          content: `Cannot subtract ${Math.abs(amount)} — user only has ${formatAmount(getBalance(target.id))}.`,
           ephemeral: true,
         });
       }
@@ -144,7 +145,7 @@ async function execute(interaction) {
       .setColor(0x2ecc71)
       .addFields(
         { name: 'Code', value: `\`${code}\``, inline: true },
-        { name: 'Amount', value: `${amount} coins`, inline: true },
+        { name: 'Amount', value: formatAmount(amount), inline: true },
         { name: 'Max Uses', value: `${maxUses}`, inline: true },
         { name: 'Expires', value: expires || 'Never', inline: true }
       )
@@ -170,12 +171,12 @@ async function execute(interaction) {
       .setColor(0x3498db)
       .addFields(
         { name: 'Total Users', value: `${totalUsers}`, inline: true },
-        { name: 'Total Balance (all users)', value: `${totalBalance}`, inline: true },
+        { name: 'Total Balance (all users)', value: formatBalance(totalBalance), inline: true },
         { name: 'Total Games Played', value: `${totalGames}`, inline: true },
-        { name: 'Total Wagered', value: `${totalWagered}`, inline: true },
-        { name: 'Total Payouts', value: `${totalPayout}`, inline: true },
-        { name: 'House Profit', value: `${houseProfit}`, inline: true },
-        { name: 'Pending Withdrawals', value: `${pendingWithdrawals.count} (${pendingWithdrawals.total} coins)`, inline: false }
+        { name: 'Total Wagered', value: formatBalance(totalWagered), inline: true },
+        { name: 'Total Payouts', value: formatBalance(totalPayout), inline: true },
+        { name: 'House Profit', value: formatBalance(houseProfit), inline: true },
+        { name: 'Pending Withdrawals', value: `${pendingWithdrawals.count} (${formatAmount(pendingWithdrawals.total)})`, inline: false }
       )
       .setTimestamp();
 
@@ -201,7 +202,7 @@ async function execute(interaction) {
       .addFields(
         { name: 'Request ID', value: `${requestId}`, inline: true },
         { name: 'User', value: `<@${request.user_id}>`, inline: true },
-        { name: 'Amount', value: `${request.amount}`, inline: true },
+        { name: 'Amount', value: formatBalance(request.amount), inline: true },
         { name: 'Chain', value: request.chain, inline: true },
         { name: 'Address', value: `\`${request.address}\``, inline: false }
       )

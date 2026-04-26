@@ -14,6 +14,7 @@ const {
 } = require('../games/hilo');
 const { COLORS } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
+const { formatAmount, formatBalance } = require('../utils/formatAmount');
 
 // Active games keyed by userId.
 const activeGames = new Map();
@@ -46,11 +47,11 @@ function buildEmbed(state) {
   if (state.status === 'lost') {
     color = COLORS.lose;
     title = '🃏💀  W R O N G  💀🃏';
-    description = `${cardHistory}\n\n**-${state.bet.toLocaleString()}** coins`;
+    description = `${cardHistory}\n\n**-${formatAmount(state.bet)}**`;
   } else if (state.status === 'cashed_out') {
     color = COLORS.win;
     title = `🃏${EMOJIS.coin}  CASHED OUT  ${EMOJIS.coin}🃏`;
-    description = `${cardHistory}\n\n**+${state.payout.toLocaleString()}** coins (${state.roundMultiplier}x)`;
+    description = `${cardHistory}\n\n**+${formatAmount(state.payout)}** (${state.roundMultiplier}x)`;
   } else {
     color = COLORS.neutral;
     title = '🃏  H I - L O  🃏';
@@ -75,7 +76,7 @@ function buildEmbed(state) {
 
   if (state.status !== 'playing') {
     embed.addFields(
-      { name: `${EMOJIS.coin} Balance`, value: `\`${state.newBalance.toLocaleString()}\``, inline: true },
+      { name: `${EMOJIS.coin} Balance`, value: `\`${formatBalance(state.newBalance)}\``, inline: true },
       { name: '🔢 Nonce', value: `\`${state.nonce}\``, inline: true },
       { name: `${EMOJIS.shield} Seed`, value: `\`${state.serverSeedHash.substring(0, 12)}...\``, inline: true }
     );
@@ -151,7 +152,7 @@ async function execute(interaction) {
 
   if (bet > balance) {
     return interaction.reply({
-      content: `❌ Insufficient funds. Your balance: **${balance.toLocaleString()}** coins`,
+      content: `❌ Insufficient funds. Your balance: **${formatAmount(balance)}**`,
       ephemeral: true,
     });
   }

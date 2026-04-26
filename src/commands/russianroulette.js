@@ -13,6 +13,7 @@ const {
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
+const { formatAmount, formatBalance } = require('../utils/formatAmount');
 const { renderRussianRoulette } = require('../utils/cardRenderer');
 
 // Active lobbies keyed by channelId (one game per channel).
@@ -48,8 +49,8 @@ function buildLobbyEmbed(lobby) {
       '```\n' +
       '     🔫 💀 🎯 💀 🔫\n' +
       '```\n' +
-      `Buy-in: **${lobby.bet.toLocaleString()}** coins\n` +
-      `Prize Pool: **${(lobby.bet * lobby.players.length).toLocaleString()}** coins\n\n` +
+      `Buy-in: **${formatAmount(lobby.bet)}**\n` +
+      `Prize Pool: **${formatAmount(lobby.bet * lobby.players.length)}**\n\n` +
       `**Players (${lobby.players.length}/${MAX_PLAYERS}):**\n` +
       `${playerList}\n\n` +
       `Need at least **${MIN_PLAYERS}** players to start.\n\n` +
@@ -101,7 +102,7 @@ async function execute(interaction) {
 
   if (bet > balance) {
     return interaction.reply({
-      content: `❌ Insufficient funds. Your balance: **${balance.toLocaleString()}** coins`,
+      content: `❌ Insufficient funds. Your balance: **${formatAmount(balance)}**`,
       ephemeral: true,
     });
   }
@@ -169,7 +170,7 @@ async function runGame(interaction, lobby, channelId) {
       '  🔫 The cylinder spins...\n' +
       '  *click* *click* *click*\n' +
       '```\n' +
-      `**${alive.length}** players. **1** bullet. **${totalPot.toLocaleString()}** coins.\n\n` +
+      `**${alive.length}** players. **1** bullet. **${formatAmount(totalPot)}**.\n\n` +
       alive.map((p) => `💚 <@${p.id}>`).join('\n') + '\n\n' +
       DIVIDER
     )
@@ -250,7 +251,7 @@ async function runGame(interaction, lobby, channelId) {
       `  ${EMOJIS.trophy} WINNER WINNER! ${EMOJIS.trophy}\n` +
       '```\n' +
       `🎉 **${winner.username}** survived and takes the pot!\n\n` +
-      `${EMOJIS.coin} **+${totalPot.toLocaleString()} coins**\n\n` +
+      `${EMOJIS.coin} **+${formatAmount(totalPot)}**\n\n` +
       '**Final standings:**\n' +
       `${EMOJIS.trophy} <@${winner.id}> — **WINNER**\n` +
       eliminated.reverse().map((p, i) =>
@@ -262,9 +263,9 @@ async function runGame(interaction, lobby, channelId) {
     .setColor(COLORS.jackpot)
     .setImage('attachment://russianroulette.png')
     .addFields(
-      { name: `${EMOJIS.coin} Prize`, value: `\`${totalPot.toLocaleString()}\``, inline: true },
+      { name: `${EMOJIS.coin} Prize`, value: `\`${formatBalance(totalPot)}\``, inline: true },
       { name: '👥 Players', value: `\`${players.length}\``, inline: true },
-      { name: `${EMOJIS.coin} Winner Balance`, value: `\`${newBalance.toLocaleString()}\``, inline: true }
+      { name: `${EMOJIS.coin} Winner Balance`, value: `\`${formatBalance(newBalance)}\``, inline: true }
     )
     .setFooter({ text: 'Only the brave survive...' })
     .setTimestamp();
@@ -314,7 +315,7 @@ async function handleButton(interaction) {
     const balance = getBalance(userId);
     if (balance < lobby.bet) {
       return interaction.reply({
-        content: `❌ Insufficient funds. You need **${lobby.bet.toLocaleString()}** coins.`,
+        content: `❌ Insufficient funds. You need **${formatAmount(lobby.bet)}**.`,
         ephemeral: true,
       });
     }

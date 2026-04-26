@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
 const { log, ACTIONS } = require('../utils/auditLog');
+const { formatAmount } = require('../utils/formatAmount');
 
 /**
  * Notification service for big win announcements and user DMs.
@@ -48,8 +49,8 @@ const checkBigWin = async (client, { userId, username, game, bet, payout, multip
     const embed = new EmbedBuilder()
       .setTitle('BIG WIN!')
       .setDescription(
-        `**${username}** just won **${payout}** coins on **${game}**!\n` +
-        `Bet: ${bet} | Multiplier: ${effectiveMultiplier.toFixed(2)}x | Profit: +${profit}`
+        `**${username}** just won **${formatAmount(payout)}** on **${game}**!\n` +
+        `Bet: ${formatAmount(bet)} | Multiplier: ${effectiveMultiplier.toFixed(2)}x | Profit: +${formatAmount(profit)}`
       )
       .setColor(0xf1c40f)
       .setTimestamp();
@@ -95,13 +96,13 @@ const notifyWithdrawalUpdate = async (client, userId, { status, amount, chain, t
   let message;
   switch (status) {
   case 'approved':
-    message = `Your withdrawal of **${amount}** coins on **${chain}** has been approved and is being processed.`;
+    message = `Your withdrawal of **${formatAmount(amount)}** on **${chain}** has been approved and is being processed.`;
     break;
   case 'rejected':
-    message = `Your withdrawal of **${amount}** coins on **${chain}** has been rejected. The funds have been returned to your balance.`;
+    message = `Your withdrawal of **${formatAmount(amount)}** on **${chain}** has been rejected. The funds have been returned to your balance.`;
     break;
   case 'completed':
-    message = `Your withdrawal of **${amount}** coins on **${chain}** is complete!\nTX: \`${txHash}\``;
+    message = `Your withdrawal of **${formatAmount(amount)}** on **${chain}** is complete!\nTX: \`${txHash}\``;
     break;
   default:
     return;

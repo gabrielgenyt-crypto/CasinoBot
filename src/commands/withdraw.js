@@ -5,6 +5,7 @@ const { validateAddress, isBlockedAddress } = require('../utils/addressValidator
 const { log, ACTIONS } = require('../utils/auditLog');
 const { COLORS } = require('../utils/animations');
 const { renderWithdraw } = require('../utils/cardRenderer');
+const { formatAmount } = require('../utils/formatAmount');
 
 const SUPPORTED_CHAINS = ['ETH', 'BSC', 'SOL', 'MATIC'];
 const DAILY_LIMIT = 50000;
@@ -12,7 +13,7 @@ const LARGE_WITHDRAWAL_THRESHOLD = 10000;
 
 const data = new SlashCommandBuilder()
   .setName('withdraw')
-  .setDescription('Withdraw coins to a blockchain address.')
+  .setDescription('Withdraw funds to a blockchain address.')
   .addIntegerOption((opt) =>
     opt.setName('amount').setDescription('Amount to withdraw').setRequired(true).setMinValue(100)
   )
@@ -57,7 +58,7 @@ async function execute(interaction) {
 
   if (amount > balance) {
     return interaction.reply({
-      content: `Insufficient funds. Your balance: **${balance}**`,
+      content: `Insufficient funds. Your balance: **${formatAmount(balance)}**`,
       ephemeral: true,
     });
   }
@@ -70,7 +71,7 @@ async function execute(interaction) {
 
   if (dailyTotal.total + amount > DAILY_LIMIT) {
     return interaction.reply({
-      content: `Daily withdrawal limit is **${DAILY_LIMIT}** coins. You have already requested **${dailyTotal.total}** today.`,
+      content: `Daily withdrawal limit is **${formatAmount(DAILY_LIMIT)}**. You have already requested **${formatAmount(dailyTotal.total)}** today.`,
       ephemeral: true,
     });
   }

@@ -2,10 +2,11 @@ const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discor
 const { getBalance, updateBalance, ensureWallet } = require('../utils/wallet');
 const { COLORS } = require('../utils/animations');
 const { renderTip } = require('../utils/cardRenderer');
+const { formatAmount } = require('../utils/formatAmount');
 
 const data = new SlashCommandBuilder()
   .setName('tip')
-  .setDescription('Send coins to another user.')
+  .setDescription('Send funds to another user.')
   .addUserOption((opt) =>
     opt.setName('user').setDescription('The user to tip').setRequired(true)
   )
@@ -32,7 +33,7 @@ async function execute(interaction) {
   const balance = getBalance(senderId);
   if (amount > balance) {
     return interaction.reply({
-      content: `Insufficient funds. Your balance: **${balance.toLocaleString()}**`,
+      content: `Insufficient funds. Your balance: **${formatAmount(balance)}**`,
       ephemeral: true,
     });
   }
