@@ -4,6 +4,7 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  AttachmentBuilder,
 } = require('discord.js');
 const { getBalance, ensureWallet } = require('../utils/wallet');
 const {
@@ -17,6 +18,7 @@ const {
 const { COLORS } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
 const { formatAmount, formatBalance } = require('../utils/formatAmount');
+const { renderTower } = require('../utils/cardRenderer');
 
 // Active games keyed by userId.
 const activeGames = new Map();
@@ -37,6 +39,25 @@ const data = new SlashCommandBuilder()
         { name: 'Medium (2 traps)', value: 'medium' }
       )
   );
+
+/**
+ * Generates the tower board PNG and wraps it in a Discord AttachmentBuilder.
+ * @param {object} state - The game state.
+ * @param {string} playerName - The player's display name.
+ * @returns {AttachmentBuilder}
+ */
+function buildImage(state, playerName) {
+  const pngBuffer = renderTower({
+    currentFloor: state.currentFloor,
+    traps: state.traps,
+    trapPositions: state.trapPositions,
+    status: state.status,
+    multiplier: state.multiplier,
+    getMultiplier,
+    playerName,
+  });
+  return new AttachmentBuilder(pngBuffer, { name: 'tower.png' });
+}
 
 /**
  * Builds the tower game embed.
@@ -61,42 +82,11 @@ function buildEmbed(state) {
     description = `Floor **${state.currentFloor}/${TOTAL_FLOORS}** | Current: **${state.multiplier}x**\nNext floor: **${nextMult}x** | Pick a tile!`;
   }
 
-  // Build a visual tower.
-  const lines = [];
-  for (let f = TOTAL_FLOORS - 1; f >= 0; f--) {
-    const floorNum = f + 1;
-    let row;
-    if (f < state.currentFloor) {
-      // Cleared floor.
-      const traps = state.trapPositions[f];
-      row = Array.from({ length: TILES_PER_FLOOR }, (_, i) =>
-        traps.includes(i) ? '💀' : '✅'
-      ).join(' ');
-    } else if (f === state.currentFloor && state.status === 'exploded') {
-      // Exploded floor.
-      const traps = state.trapPositions[f];
-      row = Array.from({ length: TILES_PER_FLOOR }, (_, i) =>
-        traps.includes(i) ? '💥' : '⬜'
-      ).join(' ');
-    } else if (state.status !== 'playing' && f > state.currentFloor) {
-      // Reveal traps on game over.
-      const traps = state.trapPositions[f];
-      row = Array.from({ length: TILES_PER_FLOOR }, (_, i) =>
-        traps.includes(i) ? '💀' : '⬜'
-      ).join(' ');
-    } else {
-      row = '❓ ❓ ❓';
-    }
-    const mult = getMultiplier(floorNum, state.traps);
-    lines.push(`\`F${String(floorNum).padStart(2)}\` ${row}  \`${mult}x\``);
-  }
-
-  description += '\n\n' + lines.join('\n');
-
   const embed = new EmbedBuilder()
     .setTitle(title)
     .setDescription(description)
     .setColor(color)
+    .setImage('attachment://tower.png')
     .setTimestamp();
 
   if (state.status !== 'playing') {
@@ -181,10 +171,12 @@ async function execute(interaction) {
 
   activeGames.set(userId, state);
 
+  const playerName = interaction.user.username;
   const embed = buildEmbed(state);
+  const attachment = buildImage(state, playerName);
   const components = buildButtons(userId, state);
 
-  return interaction.reply({ embeds: [embed], components });
+  return interaction.reply({ embeds: [embed], files: [attachment], components });
 }
 
 async function handleButton(interaction) {
@@ -204,6 +196,8 @@ async function handleButton(interaction) {
     });
   }
 
+  const playerName = interaction.user.username;
+
   if (action === 'cashout') {
     try {
       cashOutTower(state);
@@ -212,7 +206,8 @@ async function handleButton(interaction) {
     }
     activeGames.delete(ownerId);
     const embed = buildEmbed(state);
-    return interaction.update({ embeds: [embed], components: [] });
+    const attachment = buildImage(state, playerName);
+    return interaction.update({ embeds: [embed], files: [attachment], components: [] });
   }
 
   if (action === 'tile') {
@@ -227,14 +222,16 @@ async function handleButton(interaction) {
     if (state.status !== 'playing') {
       activeGames.delete(ownerId);
       const embed = buildEmbed(state);
-      return interaction.update({ embeds: [embed], components: [] });
+      const attachment = buildImage(state, playerName);
+      return interaction.update({ embeds: [embed], files: [attachment], components: [] });
     }
 
     // Game continues.
     activeGames.set(ownerId, state);
     const embed = buildEmbed(state);
+    const attachment = buildImage(state, playerName);
     const components = buildButtons(ownerId, state);
-    return interaction.update({ embeds: [embed], components });
+    return interaction.update({ embeds: [embed], files: [attachment], components });
   }
 
   return interaction.reply({ content: '❌ Unknown action.', ephemeral: true });

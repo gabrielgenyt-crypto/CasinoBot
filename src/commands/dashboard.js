@@ -20,8 +20,8 @@ const { formatAmount } = require('../utils/formatAmount');
 const { renderDashboard } = require('../utils/cardRenderer');
 
 // ─── Game Definitions ───────────────────────────────────────────────────────
-// Games that only need a bet can be launched directly from the dashboard.
-// Games that need extra options redirect the user to the specific command.
+// All games can now be launched from the dashboard. Simple games only need a
+// bet; advanced games open a modal for extra options before launching.
 
 const SIMPLE_GAMES = [
   { value: 'blackjack', label: 'Blackjack', emoji: '\u2660', description: 'Beat the dealer to 21' },
@@ -30,22 +30,21 @@ const SIMPLE_GAMES = [
   { value: 'coinflip', label: 'Coinflip', emoji: '\uD83E\uDE99', description: '50/50 heads or tails' },
   { value: 'wheel', label: 'Wheel', emoji: '\uD83C\uDFA1', description: 'Spin the wheel of fortune' },
   { value: 'hilo', label: 'Hi-Lo', emoji: '\uD83C\uDFB4', description: 'Higher or lower card game' },
+  { value: 'plinko', label: 'Plinko', emoji: '\u26AA', description: 'Drop the ball for prizes' },
   { value: 'russianroulette', label: 'Russian Roulette', emoji: '\uD83D\uDD2B', description: 'Last one standing wins' },
 ];
 
 const ADVANCED_GAMES = [
-  { value: 'dice', label: 'Dice', emoji: '\uD83C\uDFB2', description: 'Needs direction + target' },
-  { value: 'crash', label: 'Crash', emoji: '\uD83D\uDE80', description: 'Needs cashout multiplier' },
-  { value: 'mines', label: 'Mines', emoji: '\uD83D\uDCA3', description: 'Needs mine count' },
-  { value: 'roulette', label: 'Roulette', emoji: '\uD83C\uDFA8', description: 'Needs bet choice' },
-  { value: 'keno', label: 'Keno', emoji: '\uD83C\uDFB1', description: 'Needs number picks' },
-  { value: 'limbo', label: 'Limbo', emoji: '\uD83C\uDFAF', description: 'Needs target multiplier' },
-  { value: 'tower', label: 'Tower', emoji: '\uD83D\uDDFC', description: 'Needs difficulty' },
-  { value: 'plinko', label: 'Plinko', emoji: '\u26AA', description: 'Needs risk level' },
+  { value: 'dice', label: 'Dice', emoji: '\uD83C\uDFB2', description: 'Pick direction + target' },
+  { value: 'crash', label: 'Crash', emoji: '\uD83D\uDE80', description: 'Set cashout multiplier' },
+  { value: 'mines', label: 'Mines', emoji: '\uD83D\uDCA3', description: 'Choose mine count' },
+  { value: 'roulette', label: 'Roulette', emoji: '\uD83C\uDFA8', description: 'Pick your bet type' },
+  { value: 'keno', label: 'Keno', emoji: '\uD83C\uDFB1', description: 'Pick your numbers' },
+  { value: 'limbo', label: 'Limbo', emoji: '\uD83C\uDFAF', description: 'Set target multiplier' },
+  { value: 'tower', label: 'Tower', emoji: '\uD83D\uDDFC', description: 'Pick difficulty level' },
 ];
 
 const SIMPLE_GAME_SET = new Set(SIMPLE_GAMES.map((g) => g.value));
-
 // Preset bet amounts shown as buttons.
 const BET_PRESETS = [100, 500, 1000, 5000, 10000];
 
@@ -128,7 +127,7 @@ function buildGameSelect(userId) {
       description: g.description,
     })),
     ...ADVANCED_GAMES.map((g) => ({
-      label: `${g.label} \u2192`,
+      label: g.label,
       value: g.value,
       emoji: g.emoji,
       description: g.description,
@@ -144,14 +143,14 @@ function buildGameSelect(userId) {
 }
 
 /**
- * Builds the bet amount button rows. Returns two ActionRowBuilder instances
- * because Discord limits each row to 5 buttons (we have 5 presets + 1 custom).
+ * Builds the bet amount button rows. All games now enable bet buttons.
+ * For advanced games, pressing a bet button opens a modal for extra options.
  * @param {string} userId
  * @param {string|null} selectedGame - Currently selected game (null = none).
  * @returns {ActionRowBuilder[]}
  */
 function buildBetButtons(userId, selectedGame) {
-  const disabled = !selectedGame || !SIMPLE_GAME_SET.has(selectedGame);
+  const disabled = !selectedGame;
   const presetButtons = BET_PRESETS.map((amount) => {
     const label = amount >= 1000 ? `${(amount / 1000).toFixed(0)}K` : String(amount);
     return new ButtonBuilder()
@@ -194,6 +193,121 @@ function buildFooterText(session) {
   return parts.join(' \u2022 ');
 }
 
+/**
+ * Builds a modal for an advanced game that needs extra options.
+ * @param {string} ownerId
+ * @param {string} gameName
+ * @param {number} betAmount
+ * @returns {ModalBuilder}
+ */
+function buildAdvancedModal(ownerId, gameName, betAmount) {
+  const modal = new ModalBuilder()
+    .setCustomId(`dashboard:advmodal:${ownerId}:${gameName}:${betAmount}`)
+    .setTitle(`Play ${gameName.charAt(0).toUpperCase() + gameName.slice(1)}`);
+
+  switch (gameName) {
+  case 'dice': {
+    const dirInput = new TextInputBuilder()
+      .setCustomId('direction')
+      .setLabel('Direction (over or under)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('over')
+      .setRequired(true)
+      .setMinLength(2)
+      .setMaxLength(5);
+    const targetInput = new TextInputBuilder()
+      .setCustomId('target')
+      .setLabel('Target number (1-100)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('50')
+      .setRequired(true)
+      .setMinLength(1)
+      .setMaxLength(3);
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(dirInput),
+      new ActionRowBuilder().addComponents(targetInput)
+    );
+    break;
+  }
+  case 'crash': {
+    const cashoutInput = new TextInputBuilder()
+      .setCustomId('cashout')
+      .setLabel('Auto-cashout multiplier (e.g. 2.0)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('2.0')
+      .setRequired(true)
+      .setMinLength(1)
+      .setMaxLength(6);
+    modal.addComponents(new ActionRowBuilder().addComponents(cashoutInput));
+    break;
+  }
+  case 'mines': {
+    const minesInput = new TextInputBuilder()
+      .setCustomId('mines')
+      .setLabel('Number of mines (1-24)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('5')
+      .setRequired(true)
+      .setMinLength(1)
+      .setMaxLength(2);
+    modal.addComponents(new ActionRowBuilder().addComponents(minesInput));
+    break;
+  }
+  case 'roulette': {
+    const typeInput = new TextInputBuilder()
+      .setCustomId('bet_type')
+      .setLabel('Bet type (red, black, even, odd, 0-36, etc.)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('red')
+      .setRequired(true)
+      .setMinLength(1)
+      .setMaxLength(10);
+    modal.addComponents(new ActionRowBuilder().addComponents(typeInput));
+    break;
+  }
+  case 'keno': {
+    const picksInput = new TextInputBuilder()
+      .setCustomId('picks')
+      .setLabel('Your numbers (1-40, space separated, up to 10)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('3 7 12 25 33')
+      .setRequired(true)
+      .setMinLength(1)
+      .setMaxLength(50);
+    modal.addComponents(new ActionRowBuilder().addComponents(picksInput));
+    break;
+  }
+  case 'limbo': {
+    const targetInput = new TextInputBuilder()
+      .setCustomId('target')
+      .setLabel('Target multiplier (1.01 - 1000)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('2.0')
+      .setRequired(true)
+      .setMinLength(1)
+      .setMaxLength(6);
+    modal.addComponents(new ActionRowBuilder().addComponents(targetInput));
+    break;
+  }
+  case 'tower': {
+    const diffInput = new TextInputBuilder()
+      .setCustomId('difficulty')
+      .setLabel('Difficulty (easy or medium)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('easy')
+      .setRequired(false)
+      .setMinLength(0)
+      .setMaxLength(6);
+    modal.addComponents(new ActionRowBuilder().addComponents(diffInput));
+    break;
+  }
+  default:
+    break;
+  }
+
+  return modal;
+}
+
 // ─── Command Execution ──────────────────────────────────────────────────────
 
 async function execute(interaction) {
@@ -233,23 +347,7 @@ async function handleSelectMenu(interaction) {
   session.game = selectedGame;
   sessions.set(ownerId, session);
 
-  // If the game needs extra options, tell the user and keep the dashboard.
-  if (!SIMPLE_GAME_SET.has(selectedGame)) {
-    const gameDef = ADVANCED_GAMES.find((g) => g.value === selectedGame);
-    const { embed, attachment } = buildDashboard(ownerId, interaction.user.username);
-    embed.setFooter({ text: `Use /${selectedGame} to play ${gameDef?.label || selectedGame} (needs extra options)` });
-
-    const gameRow = buildGameSelect(ownerId);
-    const betRows = buildBetButtons(ownerId, selectedGame);
-
-    return interaction.update({
-      embeds: [embed],
-      files: [attachment],
-      components: [gameRow, ...betRows],
-    });
-  }
-
-  // Simple game selected -- enable bet buttons.
+  // Update the dashboard with the selected game and enabled bet buttons.
   const { embed, attachment } = buildDashboard(ownerId, interaction.user.username);
   embed.setFooter({ text: buildFooterText(session) });
 
@@ -287,34 +385,64 @@ async function handleButton(interaction) {
 
   // Custom bet -> open a modal.
   if (action === 'custom') {
-    const modal = new ModalBuilder()
-      .setCustomId(`dashboard:modal:${ownerId}`)
-      .setTitle('Enter Bet Amount');
+    // For simple games, just ask for bet amount.
+    if (SIMPLE_GAME_SET.has(session.game)) {
+      const modal = new ModalBuilder()
+        .setCustomId(`dashboard:modal:${ownerId}`)
+        .setTitle('Enter Bet Amount');
 
+      const betInput = new TextInputBuilder()
+        .setCustomId('bet_amount')
+        .setLabel('How much do you want to bet?')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('e.g. 2500')
+        .setRequired(true)
+        .setMinLength(1)
+        .setMaxLength(10);
+
+      modal.addComponents(new ActionRowBuilder().addComponents(betInput));
+      return interaction.showModal(modal);
+    }
+
+    // For advanced games, open a modal with bet + extra options.
+    const modal = buildAdvancedModal(ownerId, session.game, 0);
+    // Add bet amount as the first field.
     const betInput = new TextInputBuilder()
       .setCustomId('bet_amount')
-      .setLabel('How much do you want to bet?')
+      .setLabel('Bet amount')
       .setStyle(TextInputStyle.Short)
       .setPlaceholder('e.g. 2500')
       .setRequired(true)
       .setMinLength(1)
       .setMaxLength(10);
-
-    modal.addComponents(new ActionRowBuilder().addComponents(betInput));
+    // Prepend bet input to the modal.
+    modal.components.unshift(new ActionRowBuilder().addComponents(betInput));
+    // Update the custom ID to use advmodal with bet=0 (will read from field).
+    modal.setCustomId(`dashboard:advmodal:${ownerId}:${session.game}:0`);
     return interaction.showModal(modal);
   }
 
   // Preset bet amount.
   if (action === 'bet') {
     const betAmount = parseInt(parts[3], 10);
-    return launchGame(interaction, ownerId, session.game, betAmount);
+
+    // For simple games, launch directly.
+    if (SIMPLE_GAME_SET.has(session.game)) {
+      return launchGame(interaction, ownerId, session.game, betAmount);
+    }
+
+    // For advanced games, open a modal for extra options.
+    const modal = buildAdvancedModal(ownerId, session.game, betAmount);
+    return interaction.showModal(modal);
   }
 }
 
-// ─── Modal Handler (custom bet amount) ──────────────────────────────────────
+// ─── Modal Handler (custom bet amount + advanced game options) ──────────────
 
 async function handleModal(interaction) {
-  const [, , ownerId] = interaction.customId.split(':');
+  const parts = interaction.customId.split(':');
+  const modalType = parts[1]; // 'modal' or 'advmodal'
+  const ownerId = parts[2];
 
   if (interaction.user.id !== ownerId) {
     return interaction.reply({
@@ -323,28 +451,51 @@ async function handleModal(interaction) {
     });
   }
 
-  const session = sessions.get(ownerId);
-  if (!session?.game) {
-    return interaction.reply({
-      content: '\u274C Session expired. Use /dashboard again.',
-      ephemeral: true,
-    });
+  // Simple game custom bet modal.
+  if (modalType === 'modal') {
+    const session = sessions.get(ownerId);
+    if (!session?.game) {
+      return interaction.reply({
+        content: '\u274C Session expired. Use /dashboard again.',
+        ephemeral: true,
+      });
+    }
+
+    const rawBet = interaction.fields.getTextInputValue('bet_amount');
+    const betAmount = parseInt(rawBet, 10);
+
+    if (isNaN(betAmount) || betAmount < 1) {
+      return interaction.reply({
+        content: '\u274C Invalid bet amount. Enter a positive number.',
+        ephemeral: true,
+      });
+    }
+
+    return launchGame(interaction, ownerId, session.game, betAmount);
   }
 
-  const rawBet = interaction.fields.getTextInputValue('bet_amount');
-  const betAmount = parseInt(rawBet, 10);
+  // Advanced game modal with extra options.
+  if (modalType === 'advmodal') {
+    const gameName = parts[3];
+    let betAmount = parseInt(parts[4], 10);
 
-  if (isNaN(betAmount) || betAmount < 1) {
-    return interaction.reply({
-      content: '\u274C Invalid bet amount. Enter a positive number.',
-      ephemeral: true,
-    });
+    // If bet was 0, read it from the modal field.
+    if (betAmount === 0) {
+      const rawBet = interaction.fields.getTextInputValue('bet_amount');
+      betAmount = parseInt(rawBet, 10);
+      if (isNaN(betAmount) || betAmount < 1) {
+        return interaction.reply({
+          content: '\u274C Invalid bet amount. Enter a positive number.',
+          ephemeral: true,
+        });
+      }
+    }
+
+    return launchAdvancedGame(interaction, ownerId, gameName, betAmount);
   }
-
-  return launchGame(interaction, ownerId, session.game, betAmount);
 }
 
-// ─── Game Launcher ──────────────────────────────────────────────────────────
+// ─── Game Launcher (simple games) ───────────────────────────────────────────
 
 /**
  * Validates the bet and dispatches to the selected game command.
@@ -372,9 +523,6 @@ async function launchGame(interaction, userId, gameName, betAmount) {
   // Clean up the session.
   sessions.delete(userId);
 
-  // Build a proxy interaction that mimics a slash command interaction so the
-  // game command's execute() works without modification. We forward the real
-  // interaction's reply/editReply/followUp methods and inject the bet option.
   const optionsProxy = {
     getInteger: (name) => (name === 'bet' ? betAmount : null),
     getString: () => null,
@@ -382,20 +530,14 @@ async function launchGame(interaction, userId, gameName, betAmount) {
     getUser: () => null,
   };
 
-  // For coinflip, the game shows heads/tails buttons after the initial reply,
-  // so we need to make sure the interaction is treated as a fresh reply.
-  // We create a thin wrapper that delegates to the real interaction.
   const proxyInteraction = {
     ...interaction,
-    // Override options to inject the bet.
     options: optionsProxy,
-    // Use the real user info.
     user: interaction.user,
     member: interaction.member,
     guild: interaction.guild,
     channel: interaction.channel,
     client: interaction.client,
-    // For button/modal interactions, we need reply (not update).
     replied: false,
     deferred: false,
     reply: (...args) => interaction.reply(...args),
@@ -403,7 +545,6 @@ async function launchGame(interaction, userId, gameName, betAmount) {
     followUp: (...args) => interaction.followUp(...args),
   };
 
-  // Look up the game command from the client's command collection.
   const command = interaction.client.commands?.get(gameName);
   if (!command) {
     return interaction.reply({
@@ -424,6 +565,169 @@ async function launchGame(interaction, userId, gameName, betAmount) {
       return interaction.followUp(errorReply);
     }
     return interaction.reply(errorReply);
+  }
+}
+
+// ─── Advanced Game Launcher ─────────────────────────────────────────────────
+
+/**
+ * Launches an advanced game by reading extra options from the modal fields
+ * and building a proxy interaction with the correct option getters.
+ *
+ * @param {import('discord.js').Interaction} interaction
+ * @param {string} userId
+ * @param {string} gameName
+ * @param {number} betAmount
+ */
+async function launchAdvancedGame(interaction, userId, gameName, betAmount) {
+  ensureWallet(userId);
+  const balance = getBalance(userId);
+
+  if (betAmount > balance) {
+    return interaction.reply({
+      content: `\u274C Insufficient funds. Your balance: **${formatAmount(balance)}**`,
+      ephemeral: true,
+    });
+  }
+
+  // Clean up the session.
+  sessions.delete(userId);
+
+  // Parse extra options from the modal fields based on game type.
+  let extraOptions = {};
+  try {
+    extraOptions = parseAdvancedOptions(interaction, gameName);
+  } catch (error) {
+    return interaction.reply({
+      content: `\u274C ${error.message}`,
+      ephemeral: true,
+    });
+  }
+
+  // Build a proxy interaction with the correct option getters.
+  const optionsProxy = {
+    getInteger: (name) => {
+      if (name === 'bet') return betAmount;
+      if (name in extraOptions && typeof extraOptions[name] === 'number' && Number.isInteger(extraOptions[name])) {
+        return extraOptions[name];
+      }
+      return null;
+    },
+    getString: (name) => {
+      if (name in extraOptions && typeof extraOptions[name] === 'string') {
+        return extraOptions[name];
+      }
+      return null;
+    },
+    getNumber: (name) => {
+      if (name in extraOptions && typeof extraOptions[name] === 'number') {
+        return extraOptions[name];
+      }
+      return null;
+    },
+    getUser: () => null,
+  };
+
+  const proxyInteraction = {
+    ...interaction,
+    options: optionsProxy,
+    user: interaction.user,
+    member: interaction.member,
+    guild: interaction.guild,
+    channel: interaction.channel,
+    client: interaction.client,
+    replied: false,
+    deferred: false,
+    reply: (...args) => interaction.reply(...args),
+    editReply: (...args) => interaction.editReply(...args),
+    followUp: (...args) => interaction.followUp(...args),
+  };
+
+  const command = interaction.client.commands?.get(gameName);
+  if (!command) {
+    return interaction.reply({
+      content: `\u274C Game "${gameName}" not found.`,
+      ephemeral: true,
+    });
+  }
+
+  try {
+    await command.execute(proxyInteraction);
+  } catch (error) {
+    console.error(`[DASHBOARD] Error launching ${gameName}:`, error);
+    const errorReply = {
+      content: `\u274C Failed to launch ${gameName}. Try using /${gameName} directly.`,
+      ephemeral: true,
+    };
+    if (interaction.replied || interaction.deferred) {
+      return interaction.followUp(errorReply);
+    }
+    return interaction.reply(errorReply);
+  }
+}
+
+/**
+ * Parses extra options from modal fields for each advanced game type.
+ * Returns an object mapping option names to their parsed values.
+ *
+ * @param {import('discord.js').ModalSubmitInteraction} interaction
+ * @param {string} gameName
+ * @returns {object} Parsed options.
+ */
+function parseAdvancedOptions(interaction, gameName) {
+  switch (gameName) {
+  case 'dice': {
+    const direction = interaction.fields.getTextInputValue('direction').trim().toLowerCase();
+    if (direction !== 'over' && direction !== 'under') {
+      throw new Error('Direction must be "over" or "under".');
+    }
+    const target = parseInt(interaction.fields.getTextInputValue('target').trim(), 10);
+    if (isNaN(target) || target < 1 || target > 100) {
+      throw new Error('Target must be a number between 1 and 100.');
+    }
+    return { direction, target };
+  }
+  case 'crash': {
+    const cashout = parseFloat(interaction.fields.getTextInputValue('cashout').trim());
+    if (isNaN(cashout) || cashout < 1.01 || cashout > 1000) {
+      throw new Error('Cashout must be between 1.01 and 1000.');
+    }
+    return { cashout };
+  }
+  case 'mines': {
+    const mines = parseInt(interaction.fields.getTextInputValue('mines').trim(), 10);
+    if (isNaN(mines) || mines < 1 || mines > 24) {
+      throw new Error('Mines must be between 1 and 24.');
+    }
+    return { mines };
+  }
+  case 'roulette': {
+    const betType = interaction.fields.getTextInputValue('bet_type').trim().toLowerCase();
+    // Check if it's a number bet.
+    const numBet = parseInt(betType, 10);
+    if (!isNaN(numBet) && numBet >= 0 && numBet <= 36) {
+      return { type: betType, number: numBet };
+    }
+    return { type: betType };
+  }
+  case 'keno': {
+    const picksRaw = interaction.fields.getTextInputValue('picks').trim();
+    return { picks: picksRaw };
+  }
+  case 'limbo': {
+    const target = parseFloat(interaction.fields.getTextInputValue('target').trim());
+    if (isNaN(target) || target < 1.01 || target > 1000) {
+      throw new Error('Target must be between 1.01 and 1000.');
+    }
+    return { target };
+  }
+  case 'tower': {
+    const diffRaw = interaction.fields.getTextInputValue('difficulty').trim().toLowerCase();
+    const difficulty = diffRaw === 'medium' ? 'medium' : 'easy';
+    return { difficulty };
+  }
+  default:
+    return {};
   }
 }
 

@@ -3809,6 +3809,706 @@ function renderScratchAnim({ playerName = '' } = {}) {
   });
 }
 
+// ─── Tower Renderer ─────────────────────────────────────────────────────────
+
+const TOWER_W = 340;
+const TOWER_PAD = 24;
+const TOWER_TILE = 48;
+const TOWER_TILE_GAP = 6;
+const TOWER_TILES_PER_FLOOR = 3;
+const TOWER_TOTAL_FLOORS = 8;
+
+/**
+ * Renders a tower game board as a PNG buffer.
+ *
+ * @param {object} options
+ * @param {number} options.currentFloor - Current floor reached (0-based).
+ * @param {number} options.traps - Number of traps per floor.
+ * @param {number[][]} options.trapPositions - Trap positions per floor.
+ * @param {'playing'|'exploded'|'cashed_out'} options.status - Game status.
+ * @param {number} options.multiplier - Current multiplier.
+ * @param {function} options.getMultiplier - Function to get multiplier for a floor.
+ * @param {string} [options.playerName='Player'] - Display name.
+ * @returns {Buffer} PNG image buffer.
+ */
+function renderTower({
+  currentFloor = 0,
+  traps = 1,
+  trapPositions = [],
+  status = 'playing',
+  multiplier = 1,
+  getMultiplier,
+  playerName = 'Player',
+}) {
+  const floorH = TOWER_TILE + TOWER_TILE_GAP;
+  const gridH = TOWER_TOTAL_FLOORS * floorH - TOWER_TILE_GAP;
+  const canvasH = TOWER_PAD + 40 + gridH + 60 + TOWER_PAD;
+  const gridW = TOWER_TILES_PER_FLOOR * (TOWER_TILE + TOWER_TILE_GAP) - TOWER_TILE_GAP;
+  const multLabelW = 50;
+  const floorLabelW = 36;
+  const canvasW = Math.max(TOWER_PAD + floorLabelW + gridW + 10 + multLabelW + TOWER_PAD, TOWER_W);
+
+  const canvas = createCanvas(canvasW, canvasH);
+  const ctx = canvas.getContext('2d');
+
+  // Background.
+  const bgTop = status === 'exploded' ? '#1a0a0a' : status === 'cashed_out' ? '#0a1a10' : '#0d0a14';
+  gradientRect(ctx, 0, 0, canvasW, canvasH, 16, bgTop, '#0d1117');
+
+  // Border.
+  const borderColor = status === 'exploded' ? '#ff3366' : status === 'cashed_out' ? '#00ff88' : '#ff5722';
+  roundRect(ctx, 0, 0, canvasW, canvasH, 16);
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Player label.
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(playerName, canvasW / 2, 12);
+
+  // Draw floors from top (floor 8) to bottom (floor 1).
+  const gridStartX = TOWER_PAD + floorLabelW;
+  const gridStartY = 40;
+
+  for (let f = TOWER_TOTAL_FLOORS - 1; f >= 0; f--) {
+    const floorNum = f + 1;
+    const visualRow = TOWER_TOTAL_FLOORS - 1 - f;
+    const ty = gridStartY + visualRow * floorH;
+
+    // Floor label.
+    ctx.fillStyle = f === currentFloor && status === 'playing' ? '#ff5722' : '#555577';
+    ctx.font = 'bold 12px Arial, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`F${floorNum}`, gridStartX - 8, ty + TOWER_TILE / 2);
+
+    // Multiplier label.
+    const floorMult = getMultiplier ? getMultiplier(floorNum, traps) : 1;
+    ctx.fillStyle = f < currentFloor ? '#00ff88' : '#666688';
+    ctx.font = '11px Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${floorMult}x`, gridStartX + gridW + 10, ty + TOWER_TILE / 2);
+
+    // Draw tiles.
+    const floorTraps = trapPositions[f] || [];
+    for (let i = 0; i < TOWER_TILES_PER_FLOOR; i++) {
+      const tx = gridStartX + i * (TOWER_TILE + TOWER_TILE_GAP);
+      const isTrap = floorTraps.includes(i);
+
+      if (f < currentFloor) {
+        // Cleared floor -- reveal all.
+        roundRect(ctx, tx, ty, TOWER_TILE, TOWER_TILE, 8);
+        if (isTrap) {
+          ctx.fillStyle = '#1a0a0a';
+          ctx.fill();
+          ctx.strokeStyle = '#ff3366';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          ctx.fillStyle = '#ff3366';
+          ctx.font = 'bold 20px Arial, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('\u2620', tx + TOWER_TILE / 2, ty + TOWER_TILE / 2);
+        } else {
+          ctx.fillStyle = '#0a2a1a';
+          ctx.fill();
+          ctx.strokeStyle = '#00ff88';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          ctx.fillStyle = '#00ff88';
+          ctx.font = 'bold 20px Arial, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('\u2713', tx + TOWER_TILE / 2, ty + TOWER_TILE / 2);
+        }
+      } else if (f === currentFloor && status === 'exploded') {
+        // Exploded floor.
+        roundRect(ctx, tx, ty, TOWER_TILE, TOWER_TILE, 8);
+        if (isTrap) {
+          ctx.fillStyle = '#4a0a0a';
+          ctx.fill();
+          ctx.strokeStyle = '#ff3366';
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+          glowCircle(ctx, tx + TOWER_TILE / 2, ty + TOWER_TILE / 2, TOWER_TILE / 2, 'rgba(255,51,102,0.3)');
+          ctx.fillStyle = '#ff3366';
+          ctx.font = 'bold 22px Arial, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('\u2716', tx + TOWER_TILE / 2, ty + TOWER_TILE / 2);
+        } else {
+          ctx.fillStyle = '#1a1a2e';
+          ctx.fill();
+          ctx.strokeStyle = '#333355';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+      } else if (status !== 'playing' && f > currentFloor) {
+        // Game over -- reveal traps on unplayed floors.
+        roundRect(ctx, tx, ty, TOWER_TILE, TOWER_TILE, 8);
+        if (isTrap) {
+          ctx.fillStyle = '#1a0a0a';
+          ctx.fill();
+          ctx.strokeStyle = '#663344';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.fillStyle = '#663344';
+          ctx.font = 'bold 18px Arial, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('\u2620', tx + TOWER_TILE / 2, ty + TOWER_TILE / 2);
+        } else {
+          ctx.fillStyle = '#0d0d1a';
+          ctx.fill();
+          ctx.strokeStyle = '#333355';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+      } else {
+        // Hidden tile.
+        roundRect(ctx, tx, ty, TOWER_TILE, TOWER_TILE, 8);
+        const tileGrad = ctx.createLinearGradient(tx, ty, tx, ty + TOWER_TILE);
+        tileGrad.addColorStop(0, '#2a2a3e');
+        tileGrad.addColorStop(1, '#1a1a2e');
+        ctx.fillStyle = tileGrad;
+        ctx.fill();
+        ctx.strokeStyle = '#444466';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = '#666688';
+        ctx.font = 'bold 18px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('?', tx + TOWER_TILE / 2, ty + TOWER_TILE / 2);
+      }
+    }
+
+    // Highlight current floor row.
+    if (f === currentFloor && status === 'playing') {
+      roundRect(ctx, gridStartX - 4, ty - 4, gridW + 8, TOWER_TILE + 8, 10);
+      ctx.strokeStyle = 'rgba(255, 87, 34, 0.4)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+
+  // Footer: result text.
+  const footerY = gridStartY + gridH + 16;
+  if (status === 'cashed_out') {
+    ctx.fillStyle = '#00ff88';
+    ctx.font = 'bold 24px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`${multiplier}x`, canvasW / 2, footerY);
+  } else if (status === 'exploded') {
+    ctx.fillStyle = '#ff3366';
+    ctx.font = 'bold 24px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('TRAP!', canvasW / 2, footerY);
+  } else {
+    ctx.fillStyle = '#ff5722';
+    ctx.font = 'bold 20px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`Floor ${currentFloor} \u2022 ${multiplier}x`, canvasW / 2, footerY);
+  }
+
+  return canvas.toBuffer('image/png');
+}
+
+// ─── Hi-Lo Renderer ─────────────────────────────────────────────────────────
+
+const HILO_W = 480;
+const HILO_CARD_W = 64;
+const HILO_CARD_H = 90;
+const HILO_CARD_GAP = 10;
+const HILO_PAD = 24;
+
+/**
+ * Renders a Hi-Lo game state as a PNG buffer showing the card history.
+ *
+ * @param {object} options
+ * @param {Array<{rank: string, suit: string, value: number}>} options.cards - Card history.
+ * @param {'playing'|'lost'|'cashed_out'} options.status - Game status.
+ * @param {number} options.roundMultiplier - Current cumulative multiplier.
+ * @param {string} [options.playerName='Player'] - Display name.
+ * @returns {Buffer} PNG image buffer.
+ */
+function renderHilo({
+  cards = [],
+  status = 'playing',
+  roundMultiplier = 1,
+  playerName = 'Player',
+}) {
+  // Calculate width based on number of cards.
+  const cardCount = Math.max(cards.length, 2);
+  const cardsW = cardCount * (HILO_CARD_W + HILO_CARD_GAP) - HILO_CARD_GAP;
+  const canvasW = Math.max(cardsW + HILO_PAD * 2, HILO_W);
+  const canvasH = 260;
+
+  const canvas = createCanvas(canvasW, canvasH);
+  const ctx = canvas.getContext('2d');
+
+  // Background.
+  const bgTop = status === 'lost' ? '#1a0a0a' : status === 'cashed_out' ? '#0a1a10' : '#0d0a14';
+  gradientRect(ctx, 0, 0, canvasW, canvasH, 16, bgTop, '#0d1117');
+
+  // Border.
+  const borderColor = status === 'lost' ? '#ff3366' : status === 'cashed_out' ? '#00ff88' : '#7c4dff';
+  roundRect(ctx, 0, 0, canvasW, canvasH, 16);
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Player label.
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(playerName, canvasW / 2, 12);
+
+  // Draw cards.
+  const cardsStartX = (canvasW - cardsW) / 2;
+  const cardsY = 44;
+
+  const SUIT_INFO = {
+    '\u2660': { symbol: '\u2660', color: '#1a1a1a' },
+    '\u2663': { symbol: '\u2663', color: '#1a1a1a' },
+    '\u2665': { symbol: '\u2665', color: '#e53935' },
+    '\u2666': { symbol: '\u2666', color: '#e53935' },
+  };
+
+  for (let i = 0; i < cards.length; i++) {
+    const card = cards[i];
+    const cx = cardsStartX + i * (HILO_CARD_W + HILO_CARD_GAP);
+    const isLast = i === cards.length - 1;
+    const isLosing = isLast && status === 'lost';
+
+    // Card shadow.
+    roundRect(ctx, cx + 2, cardsY + 2, HILO_CARD_W, HILO_CARD_H, 8);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.fill();
+
+    // Card body.
+    roundRect(ctx, cx, cardsY, HILO_CARD_W, HILO_CARD_H, 8);
+    ctx.fillStyle = isLosing ? '#2a0a0a' : '#ffffff';
+    ctx.fill();
+    ctx.strokeStyle = isLosing ? '#ff3366' : '#d0d0d0';
+    ctx.lineWidth = isLosing ? 2 : 1;
+    ctx.stroke();
+
+    if (isLosing) {
+      glowCircle(ctx, cx + HILO_CARD_W / 2, cardsY + HILO_CARD_H / 2, HILO_CARD_W / 2, 'rgba(255,51,102,0.25)');
+    }
+
+    const suitInfo = SUIT_INFO[card.suit] || { symbol: card.suit, color: '#1a1a1a' };
+    const textColor = isLosing ? '#ff3366' : suitInfo.color;
+
+    // Rank top-left.
+    ctx.fillStyle = textColor;
+    ctx.font = 'bold 16px Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(card.rank, cx + 6, cardsY + 4);
+
+    // Suit top-left.
+    ctx.font = '12px Arial, sans-serif';
+    ctx.fillText(suitInfo.symbol, cx + 7, cardsY + 20);
+
+    // Center suit.
+    ctx.font = '32px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(suitInfo.symbol, cx + HILO_CARD_W / 2, cardsY + HILO_CARD_H / 2);
+
+    // Arrow between cards.
+    if (i < cards.length - 1) {
+      const arrowX = cx + HILO_CARD_W + HILO_CARD_GAP / 2;
+      const arrowY = cardsY + HILO_CARD_H / 2;
+      const nextCard = cards[i + 1];
+      let arrowColor = '#666688';
+      if (nextCard.value > card.value) arrowColor = '#00ff88';
+      else if (nextCard.value < card.value) arrowColor = '#ff3366';
+      else arrowColor = '#ffd700';
+
+      ctx.fillStyle = arrowColor;
+      ctx.font = 'bold 14px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('\u2192', arrowX, arrowY);
+    }
+  }
+
+  // Multiplier display.
+  const multY = cardsY + HILO_CARD_H + 20;
+  if (status === 'cashed_out') {
+    ctx.fillStyle = '#00ff88';
+    ctx.font = 'bold 28px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`${roundMultiplier}x`, canvasW / 2, multY);
+  } else if (status === 'lost') {
+    ctx.fillStyle = '#ff3366';
+    ctx.font = 'bold 28px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('WRONG', canvasW / 2, multY);
+  } else {
+    ctx.fillStyle = '#7c4dff';
+    ctx.font = 'bold 22px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`${roundMultiplier}x`, canvasW / 2, multY);
+
+    // Current card indicator.
+    ctx.fillStyle = '#888899';
+    ctx.font = '13px Arial, sans-serif';
+    ctx.fillText('Higher, Lower, or Same?', canvasW / 2, multY + 28);
+  }
+
+  return canvas.toBuffer('image/png');
+}
+
+// ─── Keno Renderer ──────────────────────────────────────────────────────────
+
+const KENO_COLS = 8;
+const KENO_TILE = 36;
+const KENO_GAP = 4;
+const KENO_PAD = 24;
+
+/**
+ * Renders a keno game result as a PNG buffer showing the number grid.
+ *
+ * @param {object} options
+ * @param {number} options.poolSize - Total numbers in the pool (e.g. 40).
+ * @param {number[]} options.picks - Player's picked numbers.
+ * @param {number[]} options.drawn - Numbers drawn.
+ * @param {number[]} options.hits - Numbers that matched.
+ * @param {boolean} options.won - Whether the player won.
+ * @param {number} options.hitCount - Number of hits.
+ * @param {number} options.multiplier - Payout multiplier.
+ * @param {string} [options.playerName='Player'] - Display name.
+ * @returns {Buffer} PNG image buffer.
+ */
+function renderKeno({
+  poolSize = 40,
+  picks = [],
+  drawn = [],
+  hits = [],
+  won = false,
+  hitCount = 0,
+  multiplier = 0,
+  playerName = 'Player',
+}) {
+  const rows = Math.ceil(poolSize / KENO_COLS);
+  const gridW = KENO_COLS * (KENO_TILE + KENO_GAP) - KENO_GAP;
+  const gridH = rows * (KENO_TILE + KENO_GAP) - KENO_GAP;
+  const canvasW = gridW + KENO_PAD * 2;
+  const canvasH = KENO_PAD + 40 + gridH + 70 + KENO_PAD;
+
+  const canvas = createCanvas(canvasW, canvasH);
+  const ctx = canvas.getContext('2d');
+
+  const pickSet = new Set(picks);
+  const drawnSet = new Set(drawn);
+  const hitSet = new Set(hits);
+
+  // Background.
+  gradientRect(ctx, 0, 0, canvasW, canvasH, 16,
+    won ? '#0a1a10' : '#0d0a14', '#0d1117');
+
+  // Border.
+  roundRect(ctx, 0, 0, canvasW, canvasH, 16);
+  ctx.strokeStyle = won ? '#00ff88' : '#e91e63';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Player label.
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(playerName, canvasW / 2, 12);
+
+  // Draw number grid.
+  const gridStartX = KENO_PAD;
+  const gridStartY = 40;
+
+  for (let n = 1; n <= poolSize; n++) {
+    const idx = n - 1;
+    const col = idx % KENO_COLS;
+    const row = Math.floor(idx / KENO_COLS);
+    const tx = gridStartX + col * (KENO_TILE + KENO_GAP);
+    const ty = gridStartY + row * (KENO_TILE + KENO_GAP);
+
+    const isPick = pickSet.has(n);
+    const isDrawn = drawnSet.has(n);
+    const isHit = hitSet.has(n);
+
+    roundRect(ctx, tx, ty, KENO_TILE, KENO_TILE, 6);
+
+    if (isHit) {
+      // Hit: picked and drawn.
+      ctx.fillStyle = '#0a2a1a';
+      ctx.fill();
+      ctx.strokeStyle = '#00ff88';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      glowCircle(ctx, tx + KENO_TILE / 2, ty + KENO_TILE / 2, KENO_TILE / 2, 'rgba(0,255,136,0.2)');
+      ctx.fillStyle = '#00ff88';
+    } else if (isPick && !isDrawn) {
+      // Picked but not drawn (miss).
+      ctx.fillStyle = '#2a0a0a';
+      ctx.fill();
+      ctx.strokeStyle = '#ff3366';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = '#ff3366';
+    } else if (isDrawn && !isPick) {
+      // Drawn but not picked.
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fill();
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = '#ffd700';
+    } else {
+      // Not picked, not drawn.
+      ctx.fillStyle = '#0d0d1a';
+      ctx.fill();
+      ctx.strokeStyle = '#333355';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = '#555577';
+    }
+
+    ctx.font = 'bold 14px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(n), tx + KENO_TILE / 2, ty + KENO_TILE / 2);
+  }
+
+  // Result footer.
+  const footerY = gridStartY + gridH + 16;
+  ctx.fillStyle = won ? '#00ff88' : '#ff3366';
+  ctx.font = 'bold 22px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(
+    won ? `${hitCount} HITS \u2022 ${multiplier}x` : `${hitCount} HITS`,
+    canvasW / 2, footerY
+  );
+
+  // Legend.
+  const legendY = footerY + 30;
+  ctx.font = '11px Arial, sans-serif';
+  ctx.fillStyle = '#00ff88';
+  ctx.fillText('\u25CF Hit', canvasW / 2 - 80, legendY);
+  ctx.fillStyle = '#ff3366';
+  ctx.fillText('\u25CF Miss', canvasW / 2 - 20, legendY);
+  ctx.fillStyle = '#ffd700';
+  ctx.fillText('\u25CF Drawn', canvasW / 2 + 40, legendY);
+
+  return canvas.toBuffer('image/png');
+}
+
+// ─── Limbo Renderer ─────────────────────────────────────────────────────────
+
+const LIMBO_W = 420;
+const LIMBO_H = 260;
+
+/**
+ * Renders a limbo game result as a PNG buffer with a target vs result display.
+ *
+ * @param {object} options
+ * @param {number} options.multiplier - The rolled multiplier.
+ * @param {number} options.target - The target multiplier.
+ * @param {boolean} options.won - Whether the player won.
+ * @param {string} [options.playerName='Player'] - Display name.
+ * @returns {Buffer} PNG image buffer.
+ */
+function renderLimbo({
+  multiplier = 1,
+  target = 2,
+  won = false,
+  playerName = 'Player',
+}) {
+  const canvas = createCanvas(LIMBO_W, LIMBO_H);
+  const ctx = canvas.getContext('2d');
+
+  // Background.
+  gradientRect(ctx, 0, 0, LIMBO_W, LIMBO_H, 16,
+    won ? '#0a1a10' : '#1a0a0a', '#0d1117');
+
+  // Border.
+  roundRect(ctx, 0, 0, LIMBO_W, LIMBO_H, 16);
+  ctx.strokeStyle = won ? '#00ff88' : '#ff3366';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Player label.
+  ctx.fillStyle = '#e0e0e0';
+  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(playerName, LIMBO_W / 2, 12);
+
+  // Central multiplier display with glow.
+  const cx = LIMBO_W / 2;
+  const cy = 100;
+  const resultColor = won ? '#00ff88' : '#ff3366';
+
+  glowCircle(ctx, cx, cy, 70, won ? 'rgba(0,255,136,0.12)' : 'rgba(255,51,102,0.12)');
+
+  // Circle background.
+  ctx.beginPath();
+  ctx.arc(cx, cy, 52, 0, Math.PI * 2);
+  const circGrad = ctx.createRadialGradient(cx, cy, 5, cx, cy, 52);
+  circGrad.addColorStop(0, '#1a1a2e');
+  circGrad.addColorStop(1, '#0d0d1a');
+  ctx.fillStyle = circGrad;
+  ctx.fill();
+  ctx.strokeStyle = resultColor;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // Multiplier value.
+  ctx.fillStyle = resultColor;
+  ctx.font = 'bold 36px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`${multiplier}x`, cx, cy);
+
+  // Target bar.
+  const barY = 175;
+  const barH = 14;
+  const barLeft = 50;
+  const barRight = LIMBO_W - 50;
+  const barW = barRight - barLeft;
+
+  // Bar background.
+  roundRect(ctx, barLeft, barY, barW, barH, barH / 2);
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fill();
+  ctx.strokeStyle = '#333355';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Scale: 1x to max(target, multiplier, 5).
+  const maxVal = Math.max(target, multiplier, 5);
+
+  // Target marker.
+  const targetX = barLeft + ((target - 1) / (maxVal - 1)) * barW;
+  glowCircle(ctx, targetX, barY + barH / 2, 12, 'rgba(255, 153, 0, 0.3)');
+  ctx.fillStyle = '#ff9900';
+  ctx.beginPath();
+  ctx.arc(targetX, barY + barH / 2, 7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Result marker.
+  const resultX = barLeft + Math.min((multiplier - 1) / (maxVal - 1), 1) * barW;
+  glowCircle(ctx, resultX, barY + barH / 2, 16, won ? 'rgba(0,255,136,0.3)' : 'rgba(255,51,102,0.3)');
+  ctx.fillStyle = resultColor;
+  ctx.beginPath();
+  ctx.arc(resultX, barY + barH / 2, 9, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Labels.
+  ctx.font = '12px Arial, sans-serif';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = '#555577';
+  ctx.textAlign = 'left';
+  ctx.fillText('1x', barLeft, barY + barH + 6);
+  ctx.textAlign = 'right';
+  ctx.fillText(`${maxVal}x`, barRight, barY + barH + 6);
+
+  // Target label.
+  ctx.fillStyle = '#ff9900';
+  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(`Target: ${target}x`, LIMBO_W / 2, barY + barH + 24);
+
+  return canvas.toBuffer('image/png');
+}
+
+// ─── Tower Animation Renderer ───────────────────────────────────────────────
+
+/**
+ * Tower animation: shows a tower icon with "Climbing . . ."
+ */
+function renderTowerAnim({ playerName = '' } = {}) {
+  return renderAnimationFrame({
+    title: 'T O W E R',
+    status: 'Climbing . . .',
+    accentColor: '#ff5722',
+    playerName,
+    drawIcon: (ctx, cx, cy) => {
+      // Simple tower shape.
+      const w = 30;
+      const h = 40;
+      roundRect(ctx, cx - w / 2, cy - h / 2, w, h, 4);
+      const towerGrad = ctx.createLinearGradient(cx, cy - h / 2, cx, cy + h / 2);
+      towerGrad.addColorStop(0, '#ff5722');
+      towerGrad.addColorStop(1, '#bf360c');
+      ctx.fillStyle = towerGrad;
+      ctx.fill();
+      // Floor lines.
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 1;
+      for (let i = 1; i < 4; i++) {
+        const ly = cy - h / 2 + i * (h / 4);
+        ctx.beginPath();
+        ctx.moveTo(cx - w / 2 + 3, ly);
+        ctx.lineTo(cx + w / 2 - 3, ly);
+        ctx.stroke();
+      }
+    },
+  });
+}
+
+/**
+ * Hi-Lo animation: shows cards with "Drawing . . ."
+ */
+function renderHiloAnim({ playerName = '' } = {}) {
+  return renderAnimationFrame({
+    title: 'H I - L O',
+    status: 'Drawing . . .',
+    accentColor: '#7c4dff',
+    playerName,
+    drawIcon: (ctx, cx, cy) => {
+      // Two overlapping cards with arrows.
+      const cw = 30;
+      const ch = 42;
+      for (let i = 0; i < 2; i++) {
+        const ox = cx - 20 + i * 18;
+        const oy = cy - ch / 2 + i * 4;
+        roundRect(ctx, ox, oy, cw, ch, 5);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.strokeStyle = '#7c4dff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.fillStyle = '#7c4dff';
+        ctx.font = 'bold 16px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('?', ox + cw / 2, oy + ch / 2);
+      }
+    },
+  });
+}
+
 module.exports = {
   renderBlackjackTable,
   renderCoinflip,
@@ -3841,4 +4541,10 @@ module.exports = {
   renderDashboard,
   renderScratchCard,
   renderScratchAnim,
+  renderTower,
+  renderHilo,
+  renderKeno,
+  renderLimbo,
+  renderTowerAnim,
+  renderHiloAnim,
 };

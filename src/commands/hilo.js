@@ -4,6 +4,7 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  AttachmentBuilder,
 } = require('discord.js');
 const { getBalance, ensureWallet } = require('../utils/wallet');
 const {
@@ -15,6 +16,7 @@ const {
 const { COLORS } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
 const { formatAmount, formatBalance } = require('../utils/formatAmount');
+const { renderHilo } = require('../utils/cardRenderer');
 
 // Active games keyed by userId.
 const activeGames = new Map();
@@ -27,11 +29,19 @@ const data = new SlashCommandBuilder()
   );
 
 /**
- * Formats a card for display.
+ * Generates the Hi-Lo board PNG and wraps it in a Discord AttachmentBuilder.
+ * @param {object} state - The game state.
+ * @param {string} playerName - The player's display name.
+ * @returns {AttachmentBuilder}
  */
-function formatCard(card) {
-  const suitEmoji = { '♠': '♠️', '♥': '♥️', '♦': '♦️', '♣': '♣️' };
-  return `**${card.rank}**${suitEmoji[card.suit] || card.suit}`;
+function buildImage(state, playerName) {
+  const pngBuffer = renderHilo({
+    cards: state.cards,
+    status: state.status,
+    roundMultiplier: state.roundMultiplier,
+    playerName,
+  });
+  return new AttachmentBuilder(pngBuffer, { name: 'hilo.png' });
 }
 
 /**
@@ -42,16 +52,14 @@ function buildEmbed(state) {
   let title;
   let description;
 
-  const cardHistory = state.cards.map((c) => formatCard(c)).join(' → ');
-
   if (state.status === 'lost') {
     color = COLORS.lose;
     title = '🃏💀  W R O N G  💀🃏';
-    description = `${cardHistory}\n\n**-${formatAmount(state.bet)}**`;
+    description = `**-${formatAmount(state.bet)}**`;
   } else if (state.status === 'cashed_out') {
     color = COLORS.win;
     title = `🃏${EMOJIS.coin}  CASHED OUT  ${EMOJIS.coin}🃏`;
-    description = `${cardHistory}\n\n**+${formatAmount(state.payout)}** (${state.roundMultiplier}x)`;
+    description = `**+${formatAmount(state.payout)}** (${state.roundMultiplier}x)`;
   } else {
     color = COLORS.neutral;
     title = '🃏  H I - L O  🃏';
@@ -60,8 +68,7 @@ function buildEmbed(state) {
     const loMult = guessMultiplier(current.value, 'lower');
     const sameMult = guessMultiplier(current.value, 'same');
 
-    description = `${cardHistory}\n\n` +
-      `Current: ${formatCard(current)}\n` +
+    description =
       `Multiplier: **${state.roundMultiplier}x**\n\n` +
       `📈 Higher: **${hiMult > 0 ? hiMult + 'x' : '---'}** | ` +
       `📉 Lower: **${loMult > 0 ? loMult + 'x' : '---'}** | ` +
@@ -72,6 +79,7 @@ function buildEmbed(state) {
     .setTitle(title)
     .setDescription(description)
     .setColor(color)
+    .setImage('attachment://hilo.png')
     .setTimestamp();
 
   if (state.status !== 'playing') {
@@ -169,10 +177,12 @@ async function execute(interaction) {
 
   activeGames.set(userId, state);
 
+  const playerName = interaction.user.username;
   const embed = buildEmbed(state);
+  const attachment = buildImage(state, playerName);
   const components = buildButtons(userId, state);
 
-  return interaction.reply({ embeds: [embed], components });
+  return interaction.reply({ embeds: [embed], files: [attachment], components });
 }
 
 async function handleButton(interaction) {
@@ -192,6 +202,8 @@ async function handleButton(interaction) {
     });
   }
 
+  const playerName = interaction.user.username;
+
   if (action === 'cashout') {
     try {
       cashOutHilo(state);
@@ -200,7 +212,8 @@ async function handleButton(interaction) {
     }
     activeGames.delete(ownerId);
     const embed = buildEmbed(state);
-    return interaction.update({ embeds: [embed], components: [] });
+    const attachment = buildImage(state, playerName);
+    return interaction.update({ embeds: [embed], files: [attachment], components: [] });
   }
 
   if (['higher', 'lower', 'same'].includes(action)) {
@@ -216,14 +229,16 @@ async function handleButton(interaction) {
     if (state.status !== 'playing') {
       activeGames.delete(ownerId);
       const embed = buildEmbed(state);
-      return interaction.update({ embeds: [embed], components: [] });
+      const attachment = buildImage(state, playerName);
+      return interaction.update({ embeds: [embed], files: [attachment], components: [] });
     }
 
     // Game continues.
     activeGames.set(ownerId, state);
     const embed = buildEmbed(state);
+    const attachment = buildImage(state, playerName);
     const components = buildButtons(ownerId, state);
-    return interaction.update({ embeds: [embed], components });
+    return interaction.update({ embeds: [embed], files: [attachment], components });
   }
 
   return interaction.reply({ content: '❌ Unknown action.', ephemeral: true });

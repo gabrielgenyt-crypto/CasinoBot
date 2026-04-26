@@ -4,7 +4,7 @@ const { playKeno, POOL_SIZE, MAX_PICKS } = require('../games/keno');
 const { COLORS, sleep } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
 const { formatAmount, formatBalance } = require('../utils/formatAmount');
-const { renderAnimationFrame } = require('../utils/cardRenderer');
+const { renderAnimationFrame, renderKeno } = require('../utils/cardRenderer');
 
 const data = new SlashCommandBuilder()
   .setName('keno')
@@ -84,25 +84,28 @@ async function execute(interaction) {
   // ── Result ──
   const color = result.won ? COLORS.win : COLORS.lose;
 
-  // Format the drawn numbers, highlighting hits.
-  const drawnDisplay = result.drawn
-    .map((n) => result.hits.includes(n) ? `**[${n}]**` : `${n}`)
-    .join('  ');
-
-  const picksDisplay = result.picks
-    .map((n) => result.hits.includes(n) ? `**${n}**` : `~~${n}~~`)
-    .join('  ');
+  // Render the keno board PNG.
+  const pngBuffer = renderKeno({
+    poolSize: POOL_SIZE,
+    picks: result.picks,
+    drawn: result.drawn,
+    hits: result.hits,
+    won: result.won,
+    hitCount: result.hitCount,
+    multiplier: result.multiplier,
+    playerName: interaction.user.username,
+  });
+  const attachment = new AttachmentBuilder(pngBuffer, { name: 'keno.png' });
 
   const finalEmbed = new EmbedBuilder()
     .setTitle(result.won ? `🎱${EMOJIS.coin}  K E N O  ${EMOJIS.coin}🎱` : '🎱  K E N O  🎱')
     .setDescription(
-      `**Draw:** ${drawnDisplay}\n\n` +
-      `**Your picks:** ${picksDisplay}\n\n` +
-      (result.won
+      result.won
         ? `**${result.hitCount}/${result.picks.length}** matched! **+${formatAmount(result.payout)}** (${result.multiplier}x)`
-        : `**${result.hitCount}/${result.picks.length}** matched -- better luck next time!`)
+        : `**${result.hitCount}/${result.picks.length}** matched -- better luck next time!`
     )
     .setColor(color)
+    .setImage('attachment://keno.png')
     .addFields(
       { name: `${EMOJIS.coin} Balance`, value: `\`${formatBalance(result.newBalance)}\``, inline: true },
       { name: '🔢 Nonce', value: `\`${result.nonce}\``, inline: true },
@@ -119,7 +122,7 @@ async function execute(interaction) {
     });
   }
 
-  return msg.edit({ embeds: [finalEmbed], files: [] });
+  return msg.edit({ embeds: [finalEmbed], files: [attachment] });
 }
 
 module.exports = { data, execute };

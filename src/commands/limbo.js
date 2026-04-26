@@ -4,7 +4,7 @@ const { playLimbo } = require('../games/limbo');
 const { COLORS, sleep } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
 const { formatAmount, formatBalance } = require('../utils/formatAmount');
-const { renderAnimationFrame } = require('../utils/cardRenderer');
+const { renderAnimationFrame, renderLimbo } = require('../utils/cardRenderer');
 
 const data = new SlashCommandBuilder()
   .setName('limbo')
@@ -72,6 +72,15 @@ async function execute(interaction) {
   // ── Result ──
   const color = result.won ? COLORS.win : COLORS.lose;
 
+  // Render the limbo result PNG.
+  const pngBuffer = renderLimbo({
+    multiplier: result.multiplier,
+    target: result.target,
+    won: result.won,
+    playerName: interaction.user.username,
+  });
+  const attachment = new AttachmentBuilder(pngBuffer, { name: 'limbo-result.png' });
+
   const finalEmbed = new EmbedBuilder()
     .setTitle(result.won ? `🎯${EMOJIS.coin}  ${result.multiplier}x  ${EMOJIS.coin}🎯` : `🎯  ${result.multiplier}x  🎯`)
     .setDescription(
@@ -80,6 +89,7 @@ async function execute(interaction) {
         : `Rolled **${result.multiplier}x** -- needed **${result.target}x** or higher`
     )
     .setColor(color)
+    .setImage('attachment://limbo-result.png')
     .addFields(
       { name: '🎯 Target', value: `\`${result.target}x\``, inline: true },
       { name: `${EMOJIS.coin} Balance`, value: `\`${formatBalance(result.newBalance)}\``, inline: true },
@@ -97,7 +107,7 @@ async function execute(interaction) {
     });
   }
 
-  return msg.edit({ embeds: [finalEmbed], files: [] });
+  return msg.edit({ embeds: [finalEmbed], files: [attachment] });
 }
 
 module.exports = { data, execute };
