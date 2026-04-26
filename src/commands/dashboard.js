@@ -144,14 +144,15 @@ function buildGameSelect(userId) {
 }
 
 /**
- * Builds the bet amount button row.
+ * Builds the bet amount button rows. Returns two ActionRowBuilder instances
+ * because Discord limits each row to 5 buttons (we have 5 presets + 1 custom).
  * @param {string} userId
  * @param {string|null} selectedGame - Currently selected game (null = none).
- * @returns {ActionRowBuilder}
+ * @returns {ActionRowBuilder[]}
  */
 function buildBetButtons(userId, selectedGame) {
   const disabled = !selectedGame || !SIMPLE_GAME_SET.has(selectedGame);
-  const buttons = BET_PRESETS.map((amount) => {
+  const presetButtons = BET_PRESETS.map((amount) => {
     const label = amount >= 1000 ? `${(amount / 1000).toFixed(0)}K` : String(amount);
     return new ButtonBuilder()
       .setCustomId(`dashboard:bet:${userId}:${amount}`)
@@ -160,16 +161,17 @@ function buildBetButtons(userId, selectedGame) {
       .setDisabled(disabled);
   });
 
-  buttons.push(
-    new ButtonBuilder()
-      .setCustomId(`dashboard:custom:${userId}`)
-      .setLabel('Custom')
-      .setStyle(ButtonStyle.Primary)
-      .setEmoji('\u270F\uFE0F')
-      .setDisabled(disabled)
-  );
+  const customButton = new ButtonBuilder()
+    .setCustomId(`dashboard:custom:${userId}`)
+    .setLabel('Custom')
+    .setStyle(ButtonStyle.Primary)
+    .setEmoji('\u270F\uFE0F')
+    .setDisabled(disabled);
 
-  return new ActionRowBuilder().addComponents(buttons);
+  return [
+    new ActionRowBuilder().addComponents(presetButtons),
+    new ActionRowBuilder().addComponents(customButton),
+  ];
 }
 
 /**
@@ -205,12 +207,12 @@ async function execute(interaction) {
   embed.setFooter({ text: buildFooterText(null) });
 
   const gameRow = buildGameSelect(userId);
-  const betRow = buildBetButtons(userId, null);
+  const betRows = buildBetButtons(userId, null);
 
   return interaction.reply({
     embeds: [embed],
     files: [attachment],
-    components: [gameRow, betRow],
+    components: [gameRow, ...betRows],
   });
 }
 
@@ -238,12 +240,12 @@ async function handleSelectMenu(interaction) {
     embed.setFooter({ text: `Use /${selectedGame} to play ${gameDef?.label || selectedGame} (needs extra options)` });
 
     const gameRow = buildGameSelect(ownerId);
-    const betRow = buildBetButtons(ownerId, selectedGame);
+    const betRows = buildBetButtons(ownerId, selectedGame);
 
     return interaction.update({
       embeds: [embed],
       files: [attachment],
-      components: [gameRow, betRow],
+      components: [gameRow, ...betRows],
     });
   }
 
@@ -252,12 +254,12 @@ async function handleSelectMenu(interaction) {
   embed.setFooter({ text: buildFooterText(session) });
 
   const gameRow = buildGameSelect(ownerId);
-  const betRow = buildBetButtons(ownerId, selectedGame);
+  const betRows = buildBetButtons(ownerId, selectedGame);
 
   return interaction.update({
     embeds: [embed],
     files: [attachment],
-    components: [gameRow, betRow],
+    components: [gameRow, ...betRows],
   });
 }
 
