@@ -14,6 +14,7 @@ const { getBalance, ensureWallet } = require('../utils/wallet');
 const db = require('../utils/database');
 const { COLORS } = require('../utils/animations');
 const { getVipRecord, getLevelForWagered } = require('../utils/vip');
+const { getJackpotPool } = require('../utils/jackpot');
 const EMOJIS = require('../utils/emojis');
 const { renderDashboard } = require('../utils/cardRenderer');
 
@@ -23,7 +24,8 @@ const { renderDashboard } = require('../utils/cardRenderer');
 
 const SIMPLE_GAMES = [
   { value: 'blackjack', label: 'Blackjack', emoji: '\u2660', description: 'Beat the dealer to 21' },
-  { value: 'slots', label: 'Slots', emoji: '\u2666', description: 'Spin the reels' },
+  { value: 'slots', label: 'Slots', emoji: '\u2666', description: '5 reels + jackpot' },
+  { value: 'scratch', label: 'Scratch Card', emoji: '\uD83C\uDF9F', description: 'Match 3 symbols to win' },
   { value: 'coinflip', label: 'Coinflip', emoji: '\uD83E\uDE99', description: '50/50 heads or tails' },
   { value: 'wheel', label: 'Wheel', emoji: '\uD83C\uDFA1', description: 'Spin the wheel of fortune' },
   { value: 'hilo', label: 'Hi-Lo', emoji: '\uD83C\uDCA0', description: 'Higher or lower card game' },
@@ -87,6 +89,8 @@ function buildDashboard(userId, username) {
   const vipLevel = getLevelForWagered(vipRecord.total_wagered);
   const tier = getTier(balance);
 
+  const jackpot = getJackpotPool();
+
   const pngBuffer = renderDashboard({
     playerName: username,
     balance,
@@ -96,6 +100,7 @@ function buildDashboard(userId, username) {
     winRate,
     vipName: vipLevel.name,
     vipLevel: vipLevel.level,
+    jackpotAmount: jackpot.amount,
   });
 
   const attachment = new AttachmentBuilder(pngBuffer, { name: 'dashboard.png' });

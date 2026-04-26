@@ -446,133 +446,455 @@ function renderCoinflip({ side, won, playerName = 'Player' }) {
   return canvas.toBuffer('image/png');
 }
 
-// ─── Slots Renderer ─────────────────────────────────────────────────────────
+// ─── Slots Renderer (5-Reel, 3-Row) ────────────────────────────────────────
 
-const SLOT_REEL_SIZE = 100;
-const SLOT_GAP = 20;
-const SLOT_CANVAS_W = 480;
-const SLOT_CANVAS_H = 280;
+const SLOT_CELL = 64;
+const SLOT_GAP = 6;
+const SLOT_REELS = 5;
+const SLOT_ROWS = 3;
+const SLOT_PAD = 24;
+const SLOT_CANVAS_W = SLOT_PAD * 2 + SLOT_REELS * SLOT_CELL + (SLOT_REELS - 1) * SLOT_GAP;
+const SLOT_CANVAS_H = 420;
 
-// Plain-text fallback symbols for canvas rendering (Discord custom emojis
-// cannot be drawn on a server-side canvas).
+// Visual symbol definitions: each has a draw function, primary color, and glow.
 const SLOT_SYMBOL_MAP = {
-  diamond: { text: '\u2666', color: '#00e5ff', glow: 'rgba(0, 229, 255, 0.3)' },
-  seven: { text: '7', color: '#ff1744', glow: 'rgba(255, 23, 68, 0.3)' },
-  bell: { text: '\u266A', color: '#ffd700', glow: 'rgba(255, 215, 0, 0.3)' },
-  cherry: { text: '\u2764', color: '#ff3366', glow: 'rgba(255, 51, 102, 0.3)' },
-  lemon: { text: 'L', color: '#ffee00', glow: 'rgba(255, 238, 0, 0.3)' },
-  orange: { text: 'O', color: '#ff9100', glow: 'rgba(255, 145, 0, 0.3)' },
-  grape: { text: 'G', color: '#aa66cc', glow: 'rgba(170, 102, 204, 0.3)' },
+  diamond: {
+    color: '#00e5ff', glow: 'rgba(0, 229, 255, 0.35)',
+    draw: (ctx, cx, cy, sz) => {
+      // Diamond gem shape.
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - sz * 0.45);
+      ctx.lineTo(cx + sz * 0.35, cy);
+      ctx.lineTo(cx, cy + sz * 0.45);
+      ctx.lineTo(cx - sz * 0.35, cy);
+      ctx.closePath();
+      const g = ctx.createLinearGradient(cx - sz * 0.3, cy - sz * 0.4, cx + sz * 0.3, cy + sz * 0.4);
+      g.addColorStop(0, '#b3f0ff');
+      g.addColorStop(0.5, '#00e5ff');
+      g.addColorStop(1, '#006680');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = '#80f0ff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      // Inner facet line.
+      ctx.beginPath();
+      ctx.moveTo(cx - sz * 0.2, cy - sz * 0.1);
+      ctx.lineTo(cx + sz * 0.2, cy - sz * 0.1);
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    },
+  },
+  seven: {
+    color: '#ff1744', glow: 'rgba(255, 23, 68, 0.35)',
+    draw: (ctx, cx, cy, sz) => {
+      ctx.fillStyle = '#ff1744';
+      ctx.font = `bold ${Math.round(sz * 0.7)}px Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('7', cx, cy);
+      // Neon outline.
+      ctx.strokeStyle = '#ff8a80';
+      ctx.lineWidth = 1.5;
+      ctx.strokeText('7', cx, cy);
+    },
+  },
+  bell: {
+    color: '#ffd700', glow: 'rgba(255, 215, 0, 0.35)',
+    draw: (ctx, cx, cy, sz) => {
+      const r = sz * 0.3;
+      // Bell body (arc).
+      ctx.beginPath();
+      ctx.arc(cx, cy - r * 0.2, r, Math.PI, 0);
+      ctx.lineTo(cx + r * 1.2, cy + r * 0.6);
+      ctx.lineTo(cx - r * 1.2, cy + r * 0.6);
+      ctx.closePath();
+      const g = ctx.createLinearGradient(cx, cy - r, cx, cy + r);
+      g.addColorStop(0, '#fff176');
+      g.addColorStop(1, '#f9a825');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      // Clapper.
+      ctx.beginPath();
+      ctx.arc(cx, cy + r * 0.8, r * 0.2, 0, Math.PI * 2);
+      ctx.fillStyle = '#b8860b';
+      ctx.fill();
+    },
+  },
+  cherry: {
+    color: '#ff3366', glow: 'rgba(255, 51, 102, 0.35)',
+    draw: (ctx, cx, cy, sz) => {
+      const r = sz * 0.2;
+      // Two cherries.
+      for (const dx of [-r * 0.8, r * 0.8]) {
+        ctx.beginPath();
+        ctx.arc(cx + dx, cy + r * 0.4, r, 0, Math.PI * 2);
+        const g = ctx.createRadialGradient(cx + dx - 3, cy + r * 0.4 - 3, 1, cx + dx, cy + r * 0.4, r);
+        g.addColorStop(0, '#ff8a9e');
+        g.addColorStop(1, '#cc0033');
+        ctx.fillStyle = g;
+        ctx.fill();
+        // Highlight.
+        ctx.beginPath();
+        ctx.arc(cx + dx - r * 0.3, cy + r * 0.1, r * 0.25, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.fill();
+      }
+      // Stems.
+      ctx.strokeStyle = '#2e7d32';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx - r * 0.8, cy + r * 0.4 - r);
+      ctx.quadraticCurveTo(cx, cy - r * 1.5, cx + r * 0.8, cy + r * 0.4 - r);
+      ctx.stroke();
+    },
+  },
+  lemon: {
+    color: '#ffee00', glow: 'rgba(255, 238, 0, 0.3)',
+    draw: (ctx, cx, cy, sz) => {
+      const rx = sz * 0.32;
+      const ry = sz * 0.26;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, ry, -0.2, 0, Math.PI * 2);
+      const g = ctx.createRadialGradient(cx - 4, cy - 4, 2, cx, cy, rx);
+      g.addColorStop(0, '#fffde7');
+      g.addColorStop(0.5, '#ffee00');
+      g.addColorStop(1, '#c6a700');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = '#c6a700';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    },
+  },
+  orange: {
+    color: '#ff9100', glow: 'rgba(255, 145, 0, 0.3)',
+    draw: (ctx, cx, cy, sz) => {
+      const r = sz * 0.28;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      const g = ctx.createRadialGradient(cx - 4, cy - 4, 2, cx, cy, r);
+      g.addColorStop(0, '#ffcc80');
+      g.addColorStop(0.6, '#ff9100');
+      g.addColorStop(1, '#e65100');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = '#e65100';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      // Leaf.
+      ctx.beginPath();
+      ctx.ellipse(cx + r * 0.3, cy - r - 2, 6, 3, 0.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#4caf50';
+      ctx.fill();
+    },
+  },
+  grape: {
+    color: '#aa66cc', glow: 'rgba(170, 102, 204, 0.3)',
+    draw: (ctx, cx, cy, sz) => {
+      const r = sz * 0.12;
+      const positions = [
+        [0, -r * 1.8], [-r * 1.2, -r * 0.6], [r * 1.2, -r * 0.6],
+        [-r * 0.6, r * 0.6], [r * 0.6, r * 0.6], [0, r * 1.8],
+      ];
+      for (const [dx, dy] of positions) {
+        ctx.beginPath();
+        ctx.arc(cx + dx, cy + dy, r, 0, Math.PI * 2);
+        const g = ctx.createRadialGradient(cx + dx - 2, cy + dy - 2, 1, cx + dx, cy + dy, r);
+        g.addColorStop(0, '#ce93d8');
+        g.addColorStop(1, '#7b1fa2');
+        ctx.fillStyle = g;
+        ctx.fill();
+      }
+      // Stem.
+      ctx.strokeStyle = '#4caf50';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - r * 1.8 - r);
+      ctx.lineTo(cx, cy - r * 2.8);
+      ctx.stroke();
+    },
+  },
+  wild: {
+    color: '#ffd700', glow: 'rgba(255, 215, 0, 0.4)',
+    draw: (ctx, cx, cy, sz) => {
+      // Star shape.
+      const outerR = sz * 0.35;
+      const innerR = sz * 0.15;
+      const spikes = 5;
+      ctx.beginPath();
+      for (let i = 0; i < spikes * 2; i++) {
+        const r = i % 2 === 0 ? outerR : innerR;
+        const angle = (i * Math.PI) / spikes - Math.PI / 2;
+        const x = cx + Math.cos(angle) * r;
+        const y = cy + Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      const g = ctx.createRadialGradient(cx, cy, innerR * 0.5, cx, cy, outerR);
+      g.addColorStop(0, '#fff8dc');
+      g.addColorStop(0.5, '#ffd700');
+      g.addColorStop(1, '#b8860b');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = '#fff176';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      // "W" label.
+      ctx.fillStyle = '#6b4e0a';
+      ctx.font = `bold ${Math.round(sz * 0.22)}px Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('W', cx, cy + 1);
+    },
+  },
+  scatter: {
+    color: '#e040fb', glow: 'rgba(224, 64, 251, 0.4)',
+    draw: (ctx, cx, cy, sz) => {
+      // Sparkle / starburst.
+      const r = sz * 0.32;
+      const points = 8;
+      ctx.beginPath();
+      for (let i = 0; i < points * 2; i++) {
+        const rad = i % 2 === 0 ? r : r * 0.45;
+        const angle = (i * Math.PI) / points - Math.PI / 2;
+        const x = cx + Math.cos(angle) * rad;
+        const y = cy + Math.sin(angle) * rad;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      const g = ctx.createRadialGradient(cx, cy, 2, cx, cy, r);
+      g.addColorStop(0, '#f8bbd0');
+      g.addColorStop(0.5, '#e040fb');
+      g.addColorStop(1, '#7b1fa2');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = '#f48fb1';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      // "FS" label.
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold ${Math.round(sz * 0.18)}px Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('FS', cx, cy + 1);
+    },
+  },
 };
 
 /**
- * Renders a slot machine result as a PNG buffer with neon effects.
+ * Draws a single slot symbol into a cell.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} cx - Cell center X.
+ * @param {number} cy - Cell center Y.
+ * @param {string} symbolId - Symbol identifier.
+ * @param {number} cellSize - Cell dimension.
+ * @param {boolean} highlight - Whether to add glow.
+ */
+function drawSlotSymbol(ctx, cx, cy, symbolId, cellSize, highlight) {
+  const sym = SLOT_SYMBOL_MAP[symbolId] || SLOT_SYMBOL_MAP.grape;
+  if (highlight) {
+    glowCircle(ctx, cx, cy, cellSize / 2 + 6, sym.glow);
+  }
+  sym.draw(ctx, cx, cy, cellSize);
+}
+
+/**
+ * Renders a 5-reel, 3-row slot machine result as a PNG buffer.
  *
  * @param {object} options
- * @param {Array<{emoji: string, name: string}>} options.reels - The 3 reel results.
+ * @param {object[][]} options.grid - 5x3 grid of symbol objects (grid[reel][row]).
+ * @param {object[]} options.paylineWins - Array of winning payline results.
+ * @param {object|null} options.bestWin - The highest-paying single payline win.
+ * @param {number} options.payout - Total payout.
  * @param {boolean} options.won - Whether the player won.
- * @param {number} options.multiplier - The payout multiplier.
- * @param {string} [options.playerName='Player'] - Display name for the player.
+ * @param {boolean} [options.isJackpot=false] - Jackpot-tier win.
+ * @param {boolean} [options.isBigWin=false] - Big win (20x+).
+ * @param {boolean} [options.isMegaWin=false] - Mega win (50x+).
+ * @param {number} [options.scatterCount=0] - Number of scatters on the grid.
+ * @param {object|null} [options.freeSpinResult=null] - Free spin results.
+ * @param {string} [options.playerName='Player'] - Display name.
  * @returns {Buffer} PNG image buffer.
  */
-function renderSlots({ reels, won, multiplier, playerName = 'Player' }) {
+function renderSlots({
+  grid,
+  paylineWins = [],
+  bestWin = null,
+  payout = 0,
+  won = false,
+  isJackpot = false,
+  isBigWin = false,
+  isMegaWin = false,
+  scatterCount = 0,
+  freeSpinResult = null,
+  playerName = 'Player',
+}) {
   const canvas = createCanvas(SLOT_CANVAS_W, SLOT_CANVAS_H);
   const ctx = canvas.getContext('2d');
 
-  const isJackpot = multiplier >= 10;
-
-  // Dark gradient background.
-  const bgTop = isJackpot ? '#1a1400' : won ? '#0a1a10' : '#12081e';
-  const bgBot = '#0d1117';
-  gradientRect(ctx, 0, 0, SLOT_CANVAS_W, SLOT_CANVAS_H, 16, bgTop, bgBot);
+  // ── Background ──
+  const bgTop = isJackpot ? '#1a1400' : isMegaWin ? '#1a0a2e' : isBigWin ? '#0a1a10' : won ? '#0a1210' : '#0d0a14';
+  gradientRect(ctx, 0, 0, SLOT_CANVAS_W, SLOT_CANVAS_H, 16, bgTop, '#0d1117');
 
   // Neon border.
+  const borderColor = isJackpot ? '#ffd700' : isMegaWin ? '#e040fb' : isBigWin ? '#00ff88' : won ? '#00ff88' : '#9b59b6';
   roundRect(ctx, 0, 0, SLOT_CANVAS_W, SLOT_CANVAS_H, 16);
-  ctx.strokeStyle = isJackpot ? '#ffd700' : won ? '#00ff88' : '#9b59b6';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 2.5;
   ctx.stroke();
 
-  // Ambient glow behind reels.
-  if (isJackpot) {
-    glowCircle(ctx, SLOT_CANVAS_W / 2, 120, 160, 'rgba(255, 215, 0, 0.08)');
+  // Ambient glow.
+  if (isJackpot || isMegaWin) {
+    glowCircle(ctx, SLOT_CANVAS_W / 2, 160, 200, isJackpot ? 'rgba(255, 215, 0, 0.1)' : 'rgba(224, 64, 251, 0.08)');
   }
 
-  // Player label.
+  // ── Title bar ──
   ctx.fillStyle = '#e0e0e0';
-  ctx.font = 'bold 16px Arial, sans-serif';
-  ctx.textAlign = 'center';
+  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText(playerName, SLOT_CANVAS_W / 2, 14);
+  ctx.fillText(playerName, SLOT_PAD, 12);
 
-  // Machine frame.
-  const totalReelW = 3 * SLOT_REEL_SIZE + 2 * SLOT_GAP;
-  const frameX = (SLOT_CANVAS_W - totalReelW) / 2 - 16;
-  const frameY = 46;
-  const frameW = totalReelW + 32;
-  const frameH = SLOT_REEL_SIZE + 32;
-  roundRect(ctx, frameX, frameY, frameW, frameH, 12);
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+  ctx.fillStyle = '#666688';
+  ctx.font = '11px Arial, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(`${paylineWins.length} payline${paylineWins.length !== 1 ? 's' : ''} hit`, SLOT_CANVAS_W - SLOT_PAD, 14);
+
+  // ── Machine frame ──
+  const gridW = SLOT_REELS * SLOT_CELL + (SLOT_REELS - 1) * SLOT_GAP;
+  const gridH = SLOT_ROWS * SLOT_CELL + (SLOT_ROWS - 1) * SLOT_GAP;
+  const gridX = (SLOT_CANVAS_W - gridW) / 2;
+  const gridY = 40;
+
+  // Frame background.
+  roundRect(ctx, gridX - 10, gridY - 10, gridW + 20, gridH + 20, 14);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
   ctx.fill();
-  ctx.strokeStyle = isJackpot ? '#ffd700' : '#333355';
+  ctx.strokeStyle = isJackpot ? '#ffd700' : '#2a2a44';
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  // Draw 3 reel boxes.
-  const startX = (SLOT_CANVAS_W - totalReelW) / 2;
-  const reelY = 62;
-
-  for (let i = 0; i < 3; i++) {
-    const rx = startX + i * (SLOT_REEL_SIZE + SLOT_GAP);
-    const sym = SLOT_SYMBOL_MAP[reels[i].name] || { text: '?', color: '#ffffff', glow: 'rgba(255,255,255,0.2)' };
-
-    // Symbol glow behind reel.
-    if (won) {
-      glowCircle(ctx, rx + SLOT_REEL_SIZE / 2, reelY + SLOT_REEL_SIZE / 2, SLOT_REEL_SIZE / 2 + 10, sym.glow);
+  // ── Draw grid cells ──
+  // Build a set of winning cell positions for highlighting.
+  const winCells = new Set();
+  if (bestWin) {
+    // Import paylines inline to highlight the best winning line.
+    const PAYLINES = require('../games/slots').PAYLINES;
+    const pl = PAYLINES[bestWin.payline];
+    for (let reel = 0; reel < Math.min(bestWin.count, 5); reel++) {
+      winCells.add(`${reel},${pl[reel]}`);
     }
-
-    // Reel background.
-    roundRect(ctx, rx, reelY, SLOT_REEL_SIZE, SLOT_REEL_SIZE, 10);
-    ctx.fillStyle = '#0d0d1a';
-    ctx.fill();
-    ctx.strokeStyle = won ? sym.color : '#333355';
-    ctx.lineWidth = won ? 2.5 : 1.5;
-    ctx.stroke();
-
-    // Symbol.
-    ctx.fillStyle = sym.color;
-    ctx.font = 'bold 48px Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(sym.text, rx + SLOT_REEL_SIZE / 2, reelY + SLOT_REEL_SIZE / 2);
   }
 
-  // Win line across reels.
-  if (won) {
-    const lineY = reelY + SLOT_REEL_SIZE / 2;
-    ctx.strokeStyle = isJackpot ? '#ffd700' : '#00ff88';
+  for (let reel = 0; reel < SLOT_REELS; reel++) {
+    for (let row = 0; row < SLOT_ROWS; row++) {
+      const cellX = gridX + reel * (SLOT_CELL + SLOT_GAP);
+      const cellY = gridY + row * (SLOT_CELL + SLOT_GAP);
+      const cx = cellX + SLOT_CELL / 2;
+      const cy = cellY + SLOT_CELL / 2;
+      const sym = grid[reel][row];
+      const isWinCell = winCells.has(`${reel},${row}`);
+
+      // Cell background.
+      roundRect(ctx, cellX, cellY, SLOT_CELL, SLOT_CELL, 8);
+      ctx.fillStyle = isWinCell ? 'rgba(0, 255, 136, 0.08)' : '#0a0a18';
+      ctx.fill();
+      ctx.strokeStyle = isWinCell ? (SLOT_SYMBOL_MAP[sym.id] || {}).color || '#00ff88' : '#222240';
+      ctx.lineWidth = isWinCell ? 2 : 1;
+      ctx.stroke();
+
+      // Draw the symbol.
+      drawSlotSymbol(ctx, cx, cy, sym.id, SLOT_CELL, isWinCell);
+    }
+  }
+
+  // ── Winning payline indicator ──
+  if (bestWin && bestWin.count >= 3) {
+    const PAYLINES = require('../games/slots').PAYLINES;
+    const pl = PAYLINES[bestWin.payline];
+    const lineColor = isJackpot ? '#ffd700' : isMegaWin ? '#e040fb' : '#00ff88';
+
+    ctx.strokeStyle = lineColor;
     ctx.lineWidth = 3;
-    ctx.globalAlpha = 0.6;
+    ctx.globalAlpha = 0.7;
     ctx.beginPath();
-    ctx.moveTo(startX - 8, lineY);
-    ctx.lineTo(startX + totalReelW + 8, lineY);
+    for (let reel = 0; reel < bestWin.count; reel++) {
+      const lx = gridX + reel * (SLOT_CELL + SLOT_GAP) + SLOT_CELL / 2;
+      const ly = gridY + pl[reel] * (SLOT_CELL + SLOT_GAP) + SLOT_CELL / 2;
+      if (reel === 0) ctx.moveTo(lx, ly);
+      else ctx.lineTo(lx, ly);
+    }
     ctx.stroke();
     ctx.globalAlpha = 1;
   }
 
-  // Multiplier / result text.
-  const labelY = frameY + frameH + 20;
-  if (won) {
-    ctx.fillStyle = isJackpot ? '#ffd700' : '#00ff88';
+  // ── Info section below grid ──
+  let infoY = gridY + gridH + 24;
+
+  // Scatter / free spins badge.
+  if (scatterCount >= 3) {
+    const fsLabel = freeSpinResult
+      ? `${freeSpinResult.spinResults.length} FREE SPINS`
+      : `${scatterCount} SCATTERS`;
+    ctx.fillStyle = '#e040fb';
+    ctx.font = 'bold 14px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(fsLabel, SLOT_CANVAS_W / 2, infoY);
+    infoY += 22;
+  }
+
+  // Result text.
+  if (isJackpot) {
+    ctx.fillStyle = '#ffd700';
+    ctx.font = 'bold 36px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('JACKPOT!', SLOT_CANVAS_W / 2, infoY);
+    infoY += 44;
+  } else if (isMegaWin) {
+    ctx.fillStyle = '#e040fb';
     ctx.font = 'bold 32px Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText(`${multiplier}x`, SLOT_CANVAS_W / 2, labelY);
+    ctx.fillText('MEGA WIN!', SLOT_CANVAS_W / 2, infoY);
+    infoY += 40;
+  } else if (isBigWin) {
+    ctx.fillStyle = '#00ff88';
+    ctx.font = 'bold 28px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('BIG WIN!', SLOT_CANVAS_W / 2, infoY);
+    infoY += 36;
+  } else if (won) {
+    ctx.fillStyle = '#00ff88';
+    ctx.font = 'bold 22px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('WIN', SLOT_CANVAS_W / 2, infoY);
+    infoY += 28;
   } else {
-    ctx.fillStyle = '#666688';
+    ctx.fillStyle = '#555577';
+    ctx.font = 'bold 18px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('No match', SLOT_CANVAS_W / 2, infoY);
+    infoY += 24;
+  }
+
+  // Payout amount.
+  if (won && payout > 0) {
+    ctx.fillStyle = isJackpot ? '#ffd700' : '#e0e0e0';
     ctx.font = 'bold 20px Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText('No match', SLOT_CANVAS_W / 2, labelY);
+    ctx.fillText(`+${payout.toLocaleString()} coins`, SLOT_CANVAS_W / 2, infoY);
   }
 
   return canvas.toBuffer('image/png');
@@ -2673,32 +2995,33 @@ function renderCoinflipAnim({ playerName = '', choice = '' } = {}) {
 }
 
 /**
- * Slots animation: shows slot reels with "Rolling . . ."
+ * Slots animation: shows 5 reel boxes with "Spinning . . ."
  */
 function renderSlotsAnim({ playerName = '' } = {}) {
   return renderAnimationFrame({
     title: 'S L O T   M A C H I N E',
-    status: 'Rolling . . .',
+    status: 'Spinning . . .',
     accentColor: '#9b59b6',
     playerName,
+    subtitle: '5 reels \u2022 20 paylines',
     drawIcon: (ctx, cx, cy) => {
-      // Three reel boxes with question marks.
-      const reelW = 44;
-      const reelH = 44;
-      const gap = 14;
-      const totalW = 3 * reelW + 2 * gap;
+      // Five reel boxes with question marks.
+      const reelW = 32;
+      const reelH = 32;
+      const gap = 8;
+      const totalW = 5 * reelW + 4 * gap;
       const startX = cx - totalW / 2;
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 5; i++) {
         const rx = startX + i * (reelW + gap);
         const ry = cy - reelH / 2;
-        roundRect(ctx, rx, ry, reelW, reelH, 8);
+        roundRect(ctx, rx, ry, reelW, reelH, 6);
         ctx.fillStyle = '#0d0d1a';
         ctx.fill();
         ctx.strokeStyle = '#9b59b6';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         ctx.stroke();
         ctx.fillStyle = '#9b59b6';
-        ctx.font = 'bold 22px Arial, sans-serif';
+        ctx.font = 'bold 16px Arial, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('?', rx + reelW / 2, cy);
@@ -2948,7 +3271,8 @@ const DASH_PAD = 28;
  */
 const DASHBOARD_GAMES = [
   { name: 'Blackjack', desc: 'Beat the dealer', icon: '\u2660', color: '#1a6b3c' },
-  { name: 'Slots', desc: 'Spin to win', icon: '\u2666', color: '#9b59b6' },
+  { name: 'Slots', desc: '5 reels + jackpot', icon: '\u2666', color: '#9b59b6' },
+  { name: 'Scratch', desc: 'Match 3 to win', icon: '\u2733', color: '#ffd700' },
   { name: 'Dice', desc: 'Over or under', icon: '\u2684', color: '#3498db' },
   { name: 'Roulette', desc: 'Pick your number', icon: '\u25CE', color: '#e53935' },
   { name: 'Coinflip', desc: '50/50 flip', icon: '\u00A2', color: '#ffd700' },
@@ -2990,10 +3314,12 @@ function renderDashboard({
   winRate = '0.0',
   vipName = 'None',
   vipLevel = 0,
+  jackpotAmount = 0,
 }) {
   // Calculate dynamic height based on game grid rows.
   const gameRows = Math.ceil(DASHBOARD_GAMES.length / DASH_GAME_COLS);
-  const headerH = 170; // balance section + stats row
+  const jackpotH = jackpotAmount > 0 ? 60 : 0;
+  const headerH = 170 + jackpotH; // balance section + stats row + jackpot
   const gamesHeaderH = 40; // "GAMES" section title
   const gamesGridH = gameRows * (DASH_GAME_TILE_H + DASH_GAME_GAP) - DASH_GAME_GAP;
   const footerH = 44;
@@ -3094,6 +3420,44 @@ function renderDashboard({
   ctx.font = 'bold 16px Arial, sans-serif';
   ctx.fillText('COINS', DASH_PAD + balW + 12, curY + 22);
   curY += 56;
+
+  // ── Jackpot Ticker ──
+  if (jackpotAmount > 0) {
+    // Jackpot banner background.
+    roundRect(ctx, DASH_PAD, curY, DASH_W - DASH_PAD * 2, 44, 10);
+    const jpGrad = ctx.createLinearGradient(DASH_PAD, curY, DASH_W - DASH_PAD, curY);
+    jpGrad.addColorStop(0, 'rgba(255, 215, 0, 0.08)');
+    jpGrad.addColorStop(0.5, 'rgba(255, 215, 0, 0.15)');
+    jpGrad.addColorStop(1, 'rgba(255, 215, 0, 0.08)');
+    ctx.fillStyle = jpGrad;
+    ctx.fill();
+    ctx.strokeStyle = '#ffd700';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Sparkle decorations.
+    ctx.fillStyle = '#ffd700';
+    ctx.font = '14px Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('\u2728', DASH_PAD + 12, curY + 22);
+    ctx.textAlign = 'right';
+    ctx.fillText('\u2728', DASH_W - DASH_PAD - 12, curY + 22);
+
+    // Jackpot label.
+    ctx.fillStyle = '#ffd700';
+    ctx.font = 'bold 12px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('PROGRESSIVE JACKPOT', DASH_W / 2, curY + 6);
+
+    // Jackpot amount.
+    ctx.fillStyle = '#ffd700';
+    ctx.font = 'bold 18px Arial, sans-serif';
+    ctx.fillText(`${jackpotAmount.toLocaleString()} COINS`, DASH_W / 2, curY + 22);
+
+    curY += 54;
+  }
 
   // ── Stats row ──
   glowLine(ctx, DASH_PAD, curY, DASH_W - DASH_PAD * 2, '#333355');
@@ -3211,6 +3575,240 @@ function renderDashboard({
   return canvas.toBuffer('image/png');
 }
 
+// ─── Scratch Card Renderer ──────────────────────────────────────────────────
+
+const SCRATCH_TILE = 80;
+const SCRATCH_GAP = 10;
+const SCRATCH_GRID = 3;
+const SCRATCH_PAD = 28;
+const SCRATCH_W = SCRATCH_PAD * 2 + SCRATCH_GRID * SCRATCH_TILE + (SCRATCH_GRID - 1) * SCRATCH_GAP;
+const SCRATCH_H = 400;
+
+// Prize symbol visual definitions for the scratch card.
+const SCRATCH_SYMBOL_MAP = {
+  jackpot: { color: '#00e5ff', bg: '#0a2a3a', icon: '\u2666', label: 'JACKPOT' },
+  gold:    { color: '#ffd700', bg: '#2a2000', icon: '\u2605', label: 'GOLD' },
+  silver:  { color: '#c0c0c0', bg: '#1a1a2e', icon: '\u2605', label: 'SILVER' },
+  bronze:  { color: '#cd7f32', bg: '#1a1008', icon: '\u2605', label: 'BRONZE' },
+  star:    { color: '#ffee00', bg: '#1a1a00', icon: '\u2729', label: 'STAR' },
+  coin:    { color: '#ffd700', bg: '#1a1400', icon: '\u00A2', label: 'COIN' },
+  cherry:  { color: '#ff3366', bg: '#1a0a10', icon: '\u2764', label: 'CHERRY' },
+  blank:   { color: '#555577', bg: '#0d0d1a', icon: '\u2716', label: '' },
+};
+
+/**
+ * Renders a scratch card as a PNG buffer.
+ *
+ * @param {object} options
+ * @param {object[]} options.tiles - Array of 9 prize symbol objects.
+ * @param {number[]} options.revealed - Indices of revealed tiles.
+ * @param {boolean} options.complete - Whether the card is fully scratched.
+ * @param {object[]} options.matches - Array of match results.
+ * @param {number} options.payout - Total payout.
+ * @param {string} [options.playerName='Player'] - Display name.
+ * @returns {Buffer} PNG image buffer.
+ */
+function renderScratchCard({
+  tiles = [],
+  revealed = [],
+  complete = false,
+  matches = [],
+  payout = 0,
+  playerName = 'Player',
+}) {
+  const canvas = createCanvas(SCRATCH_W, SCRATCH_H);
+  const ctx = canvas.getContext('2d');
+  const revealedSet = new Set(revealed);
+  const won = payout > 0;
+
+  // Background.
+  gradientRect(ctx, 0, 0, SCRATCH_W, SCRATCH_H, 16,
+    won ? '#0a1a10' : '#0d0a14', '#0d1117');
+
+  // Border.
+  roundRect(ctx, 0, 0, SCRATCH_W, SCRATCH_H, 16);
+  ctx.strokeStyle = won ? '#ffd700' : '#9b59b6';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // Title.
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 20px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText('SCRATCH CARD', SCRATCH_W / 2, 14);
+
+  // Player name.
+  ctx.fillStyle = '#888899';
+  ctx.font = '12px Arial, sans-serif';
+  ctx.fillText(playerName, SCRATCH_W / 2, 38);
+
+  // Grid.
+  const gridW = SCRATCH_GRID * SCRATCH_TILE + (SCRATCH_GRID - 1) * SCRATCH_GAP;
+  const gridStartX = (SCRATCH_W - gridW) / 2;
+  const gridStartY = 60;
+
+  // Build set of matched tile indices for highlighting.
+  const matchedIds = new Set();
+  if (complete) {
+    for (const m of matches) {
+      for (let i = 0; i < tiles.length; i++) {
+        if (tiles[i].id === m.symbol) matchedIds.add(i);
+      }
+    }
+  }
+
+  for (let row = 0; row < SCRATCH_GRID; row++) {
+    for (let col = 0; col < SCRATCH_GRID; col++) {
+      const idx = row * SCRATCH_GRID + col;
+      const tx = gridStartX + col * (SCRATCH_TILE + SCRATCH_GAP);
+      const ty = gridStartY + row * (SCRATCH_TILE + SCRATCH_GAP);
+      const isRevealed = revealedSet.has(idx);
+      const isMatched = matchedIds.has(idx);
+
+      if (isRevealed) {
+        // Revealed tile -- show the prize symbol.
+        const sym = SCRATCH_SYMBOL_MAP[tiles[idx].id] || SCRATCH_SYMBOL_MAP.blank;
+
+        // Glow for matched tiles.
+        if (isMatched) {
+          glowCircle(ctx, tx + SCRATCH_TILE / 2, ty + SCRATCH_TILE / 2,
+            SCRATCH_TILE / 2 + 8, `${sym.color}44`);
+        }
+
+        roundRect(ctx, tx, ty, SCRATCH_TILE, SCRATCH_TILE, 10);
+        ctx.fillStyle = sym.bg;
+        ctx.fill();
+        ctx.strokeStyle = isMatched ? sym.color : '#333355';
+        ctx.lineWidth = isMatched ? 2.5 : 1;
+        ctx.stroke();
+
+        // Icon.
+        ctx.fillStyle = sym.color;
+        ctx.font = `bold ${SCRATCH_TILE * 0.45}px Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(sym.icon, tx + SCRATCH_TILE / 2, ty + SCRATCH_TILE / 2 - 6);
+
+        // Label.
+        if (sym.label) {
+          ctx.fillStyle = sym.color;
+          ctx.font = `bold ${SCRATCH_TILE * 0.14}px Arial, sans-serif`;
+          ctx.fillText(sym.label, tx + SCRATCH_TILE / 2, ty + SCRATCH_TILE - 14);
+        }
+      } else {
+        // Hidden tile -- metallic scratch surface.
+        roundRect(ctx, tx, ty, SCRATCH_TILE, SCRATCH_TILE, 10);
+        const tileGrad = ctx.createLinearGradient(tx, ty, tx + SCRATCH_TILE, ty + SCRATCH_TILE);
+        tileGrad.addColorStop(0, '#8a8a9e');
+        tileGrad.addColorStop(0.3, '#b0b0c0');
+        tileGrad.addColorStop(0.5, '#c8c8d8');
+        tileGrad.addColorStop(0.7, '#b0b0c0');
+        tileGrad.addColorStop(1, '#8a8a9e');
+        ctx.fillStyle = tileGrad;
+        ctx.fill();
+        ctx.strokeStyle = '#666680';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Scratch pattern lines.
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 3; i++) {
+          const offset = 15 + i * 20;
+          ctx.beginPath();
+          ctx.moveTo(tx + offset, ty + 5);
+          ctx.lineTo(tx + offset + 10, ty + SCRATCH_TILE - 5);
+          ctx.stroke();
+        }
+
+        // Question mark.
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.font = `bold ${SCRATCH_TILE * 0.4}px Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('?', tx + SCRATCH_TILE / 2, ty + SCRATCH_TILE / 2);
+      }
+    }
+  }
+
+  // ── Results section ──
+  let infoY = gridStartY + SCRATCH_GRID * (SCRATCH_TILE + SCRATCH_GAP) + 10;
+
+  if (complete) {
+    glowLine(ctx, SCRATCH_PAD, infoY, SCRATCH_W - SCRATCH_PAD * 2, '#ffd700');
+    infoY += 14;
+
+    if (matches.length > 0) {
+      for (const m of matches) {
+        ctx.fillStyle = (SCRATCH_SYMBOL_MAP[m.symbol] || {}).color || '#ffffff';
+        ctx.font = 'bold 14px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText(`${m.emoji} ${m.count}x ${m.label} = ${m.multiplier}x`, SCRATCH_W / 2, infoY);
+        infoY += 20;
+      }
+
+      ctx.fillStyle = '#ffd700';
+      ctx.font = 'bold 24px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(`+${payout.toLocaleString()} coins`, SCRATCH_W / 2, infoY);
+    } else {
+      ctx.fillStyle = '#555577';
+      ctx.font = 'bold 18px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText('No matches', SCRATCH_W / 2, infoY);
+    }
+  } else {
+    ctx.fillStyle = '#888899';
+    ctx.font = '13px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`${revealed.length}/${SCRATCH_GRID * SCRATCH_GRID} revealed \u2022 Match 3 to win!`, SCRATCH_W / 2, infoY);
+  }
+
+  return canvas.toBuffer('image/png');
+}
+
+/**
+ * Scratch card animation: shows a card being scratched.
+ */
+function renderScratchAnim({ playerName = '' } = {}) {
+  return renderAnimationFrame({
+    title: 'S C R A T C H   C A R D',
+    status: 'Scratching . . .',
+    accentColor: '#ffd700',
+    playerName,
+    subtitle: 'Match 3 symbols to win!',
+    drawIcon: (ctx, cx, cy) => {
+      // 3x3 mini grid of metallic tiles.
+      const tileSize = 18;
+      const gap = 4;
+      const totalW = 3 * tileSize + 2 * gap;
+      const startX = cx - totalW / 2;
+      const startY = cy - totalW / 2;
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 3; c++) {
+          const tx = startX + c * (tileSize + gap);
+          const ty = startY + r * (tileSize + gap);
+          roundRect(ctx, tx, ty, tileSize, tileSize, 3);
+          const tg = ctx.createLinearGradient(tx, ty, tx + tileSize, ty + tileSize);
+          tg.addColorStop(0, '#8a8a9e');
+          tg.addColorStop(0.5, '#c8c8d8');
+          tg.addColorStop(1, '#8a8a9e');
+          ctx.fillStyle = tg;
+          ctx.fill();
+          ctx.strokeStyle = '#666680';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+      }
+    },
+  });
+}
+
 module.exports = {
   renderBlackjackTable,
   renderCoinflip,
@@ -3241,4 +3839,6 @@ module.exports = {
   renderWheelAnim,
   renderBlackjackAnim,
   renderDashboard,
+  renderScratchCard,
+  renderScratchAnim,
 };

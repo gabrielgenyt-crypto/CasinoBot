@@ -3,6 +3,7 @@ const { getBalance, ensureWallet } = require('../utils/wallet');
 const { playSlots } = require('../games/slots');
 const {
   COLORS,
+  SPARKLE_LINE,
   sleep,
 } = require('../utils/animations');
 const EMOJIS = require('../utils/emojis');
@@ -10,7 +11,7 @@ const { renderSlots, renderSlotsAnim } = require('../utils/cardRenderer');
 
 const data = new SlashCommandBuilder()
   .setName('slots')
-  .setDescription('🎰 Spin the slot machine! Match symbols to win big.')
+  .setDescription('🎰 5-reel slot machine with wilds, scatters & free spins!')
   .addIntegerOption((opt) =>
     opt.setName('bet').setDescription('Amount to wager').setRequired(true).setMinValue(1)
   );
@@ -40,47 +41,93 @@ async function execute(interaction) {
     throw error;
   }
 
-  // ── Animation frame: Rolling PNG ──
+  // ── Animation frame: Spinning PNG ──
   const animBuffer = renderSlotsAnim({ playerName: interaction.user.username });
-  const animAttachment = new AttachmentBuilder(animBuffer, { name: 'rolling.png' });
+  const animAttachment = new AttachmentBuilder(animBuffer, { name: 'spinning.png' });
 
   const animEmbed = new EmbedBuilder()
     .setTitle(`${EMOJIS.slots}  S L O T   M A C H I N E  ${EMOJIS.slots}`)
     .setColor(COLORS.pending)
-    .setImage('attachment://rolling.png');
+    .setImage('attachment://spinning.png');
 
   const msg = await interaction.reply({ embeds: [animEmbed], files: [animAttachment], fetchReply: true });
 
   // ── Result after delay ──
-  await sleep(2000);
+  await sleep(2200);
 
-  const isJackpot = result.multiplier >= 10;
+  // Determine embed color and title.
   let color;
+  let title;
 
-  if (isJackpot) {
+  if (result.isJackpot) {
     color = COLORS.jackpot;
+    title = `${EMOJIS.slots}${EMOJIS.coin} J A C K P O T ${EMOJIS.coin}${EMOJIS.slots}`;
+  } else if (result.isMegaWin) {
+    color = 0xe040fb; // Purple for mega wins.
+    title = `${EMOJIS.slots}${EMOJIS.fire} M E G A   W I N ${EMOJIS.fire}${EMOJIS.slots}`;
+  } else if (result.isBigWin) {
+    color = COLORS.win;
+    title = `${EMOJIS.slots}${EMOJIS.winner} B I G   W I N ${EMOJIS.winner}${EMOJIS.slots}`;
   } else if (result.won) {
     color = COLORS.win;
+    title = `${EMOJIS.slots}  S L O T S  ${EMOJIS.slots}`;
   } else {
     color = COLORS.lose;
+    title = `${EMOJIS.slots}  S L O T S  ${EMOJIS.slots}`;
+  }
+
+  // Build description.
+  let description = '';
+
+  if (result.isJackpot || result.isMegaWin) {
+    description += `${SPARKLE_LINE}\n`;
+  }
+
+  if (result.won) {
+    description += `**+${result.payout.toLocaleString()}** coins`;
+    if (result.paylineWins.length > 0) {
+      description += ` across **${result.paylineWins.length}** payline${result.paylineWins.length !== 1 ? 's' : ''}`;
+    }
+  } else {
+    description += 'Better luck next time!';
+  }
+
+  // Progressive jackpot win.
+  if (result.jackpotWin) {
+    description += `\n\n${EMOJIS.fire} **PROGRESSIVE JACKPOT!** ${EMOJIS.fire}`;
+    description += `\n${EMOJIS.coin} Jackpot prize: **+${result.jackpotWin.amount.toLocaleString()}** coins`;
+  }
+
+  // Free spins info.
+  if (result.freeSpinResult) {
+    const fs = result.freeSpinResult;
+    description += `\n\n💫 **${fs.spinResults.length} Free Spins** triggered!`;
+    description += `\n${EMOJIS.coin} Free spin winnings: **+${fs.totalWin.toLocaleString()}** coins`;
+  }
+
+  if (result.isJackpot || result.isMegaWin) {
+    description += `\n${SPARKLE_LINE}`;
   }
 
   // Render the slot machine result image.
   const pngBuffer = renderSlots({
-    reels: result.reels,
+    grid: result.grid,
+    paylineWins: result.paylineWins,
+    bestWin: result.bestWin,
+    payout: result.payout,
     won: result.won,
-    multiplier: result.multiplier,
+    isJackpot: result.isJackpot,
+    isBigWin: result.isBigWin,
+    isMegaWin: result.isMegaWin,
+    scatterCount: result.scatterCount,
+    freeSpinResult: result.freeSpinResult,
     playerName: interaction.user.username,
   });
   const attachment = new AttachmentBuilder(pngBuffer, { name: 'slots.png' });
 
   const finalEmbed = new EmbedBuilder()
-    .setTitle(isJackpot ? `${EMOJIS.slots}${EMOJIS.coin} J A C K P O T ${EMOJIS.coin}${EMOJIS.slots}` : `${EMOJIS.slots}  S L O T S  ${EMOJIS.slots}`)
-    .setDescription(
-      result.won
-        ? `**+${result.payout.toLocaleString()}** coins (${result.multiplier}x)`
-        : 'Better luck next time!'
-    )
+    .setTitle(title)
+    .setDescription(description)
     .setColor(color)
     .setImage('attachment://slots.png')
     .addFields(
@@ -88,7 +135,7 @@ async function execute(interaction) {
       { name: '🔢 Nonce', value: `\`${result.nonce}\``, inline: true },
       { name: `${EMOJIS.shield} Seed`, value: `\`${result.serverSeedHash.substring(0, 12)}...\``, inline: true }
     )
-    .setFooter({ text: `${EMOJIS.shield} Provably Fair | /fairness` })
+    .setFooter({ text: `${EMOJIS.shield} Provably Fair | 5 reels \u2022 20 paylines | /fairness` })
     .setTimestamp();
 
   if (result.vipLevelUp) {

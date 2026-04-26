@@ -1,117 +1,326 @@
 const { getNextResult } = require('../utils/provablyFair');
 const { updateBalance, getBalance, recordGame } = require('../utils/wallet');
 const { addWagered } = require('../utils/vip');
+const { contributeToJackpot, checkJackpotTrigger, awardJackpot } = require('../utils/jackpot');
 const EMOJIS = require('../utils/emojis');
 
-// Slot symbols ordered by rarity (rarest first).
-// Each symbol has a weight that determines how often it appears on a reel.
+// ─── Symbol Definitions ─────────────────────────────────────────────────────
+// Each symbol has a weight (rarity), a display emoji, and a visual id used by
+// the PNG renderer to draw the correct graphic.
+
 const SYMBOLS = [
-  { emoji: EMOJIS.diamond, name: 'diamond', weight: 2 },
-  { emoji: '7️⃣', name: 'seven', weight: 5 },
-  { emoji: '🔔', name: 'bell', weight: 8 },
-  { emoji: '🍒', name: 'cherry', weight: 12 },
-  { emoji: '🍋', name: 'lemon', weight: 15 },
-  { emoji: '🍊', name: 'orange', weight: 18 },
-  { emoji: '🍇', name: 'grape', weight: 20 },
+  { id: 'diamond',  emoji: EMOJIS.diamond, name: 'diamond',  weight: 2 },
+  { id: 'seven',    emoji: '7️⃣',           name: 'seven',    weight: 4 },
+  { id: 'bell',     emoji: '🔔',           name: 'bell',     weight: 7 },
+  { id: 'cherry',   emoji: '🍒',           name: 'cherry',   weight: 11 },
+  { id: 'lemon',    emoji: '🍋',           name: 'lemon',    weight: 14 },
+  { id: 'orange',   emoji: '🍊',           name: 'orange',   weight: 16 },
+  { id: 'grape',    emoji: '🍇',           name: 'grape',    weight: 18 },
 ];
 
-const TOTAL_WEIGHT = SYMBOLS.reduce((sum, s) => sum + s.weight, 0);
+// Special symbols.
+const WILD  = { id: 'wild',    emoji: '⭐',  name: 'wild',    weight: 3 };
+const SCATTER = { id: 'scatter', emoji: '💫', name: 'scatter', weight: 4 };
 
-// Payout table: 3-of-a-kind multipliers. RTP ~96% (house edge ~4%).
+// Full reel strip including specials.
+const REEL_SYMBOLS = [...SYMBOLS, WILD, SCATTER];
+const TOTAL_WEIGHT = REEL_SYMBOLS.reduce((sum, s) => sum + s.weight, 0);
+
+// ─── Payout Table ───────────────────────────────────────────────────────────
+// Multipliers for 3, 4, or 5 of a kind on a payline.
 const PAYOUTS = {
-  diamond: 50,
-  seven: 20,
-  bell: 10,
-  cherry: 5,
-  lemon: 3,
-  orange: 2,
-  grape: 1.5,
+  diamond: { 3: 15, 4: 50, 5: 200 },
+  seven:   { 3: 8,  4: 25, 5: 100 },
+  bell:    { 3: 5,  4: 15, 5: 50 },
+  cherry:  { 3: 3,  4: 8,  5: 25 },
+  lemon:   { 3: 2,  4: 5,  5: 15 },
+  orange:  { 3: 1.5, 4: 3, 5: 10 },
+  grape:   { 3: 1,  4: 2,  5: 8 },
+  wild:    { 3: 20, 4: 75, 5: 500 },
 };
 
-// Two matching symbols pay a reduced amount.
-const TWO_MATCH_MULTIPLIER = 0.5;
+// ─── Paylines ───────────────────────────────────────────────────────────────
+// Each payline is an array of 5 row indices (one per reel), for a 5x3 grid.
+// Row 0 = top, 1 = middle, 2 = bottom.
+const PAYLINES = [
+  [1, 1, 1, 1, 1], // Middle straight
+  [0, 0, 0, 0, 0], // Top straight
+  [2, 2, 2, 2, 2], // Bottom straight
+  [0, 1, 2, 1, 0], // V shape
+  [2, 1, 0, 1, 2], // Inverted V
+  [0, 0, 1, 2, 2], // Diagonal down
+  [2, 2, 1, 0, 0], // Diagonal up
+  [1, 0, 0, 0, 1], // Shallow V top
+  [1, 2, 2, 2, 1], // Shallow V bottom
+  [0, 1, 1, 1, 0], // Flat bump top
+  [2, 1, 1, 1, 2], // Flat bump bottom
+  [1, 0, 1, 0, 1], // Zigzag up
+  [1, 2, 1, 2, 1], // Zigzag down
+  [0, 1, 0, 1, 0], // Wave top
+  [2, 1, 2, 1, 2], // Wave bottom
+  [0, 0, 1, 0, 0], // Dip top
+  [2, 2, 1, 2, 2], // Bump bottom
+  [1, 0, 2, 0, 1], // W shape
+  [1, 2, 0, 2, 1], // M shape
+  [0, 2, 0, 2, 0], // Deep zigzag
+];
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
 /**
  * Picks a symbol from the weighted reel using a float in [0, 1).
  * @param {number} roll - A float from the provably fair system.
- * @returns {{ emoji: string, name: string }}
+ * @returns {object} The selected symbol.
  */
 const pickSymbol = (roll) => {
   let cumulative = 0;
   const target = roll * TOTAL_WEIGHT;
-  for (const symbol of SYMBOLS) {
+  for (const symbol of REEL_SYMBOLS) {
     cumulative += symbol.weight;
     if (target < cumulative) return symbol;
   }
-  // Fallback (should not happen).
-  return SYMBOLS[SYMBOLS.length - 1];
+  return REEL_SYMBOLS[REEL_SYMBOLS.length - 1];
 };
 
 /**
- * Spins the slot machine. Uses 3 consecutive provably fair results for the
- * 3 reels.
+ * Evaluates a single payline for matches, treating wilds as substitutes.
+ * Returns the best match (longest run from left) and its payout info.
+ *
+ * @param {object[][]} grid - 5x3 grid of symbols (grid[reel][row]).
+ * @param {number[]} payline - Array of 5 row indices.
+ * @returns {{ symbol: string, count: number, multiplier: number }|null}
+ */
+function evaluatePayline(grid, payline) {
+  const lineSymbols = payline.map((row, reel) => grid[reel][row]);
+
+  // Find the first non-wild symbol to anchor the match.
+  let anchor = null;
+  for (const sym of lineSymbols) {
+    if (sym.id !== 'wild' && sym.id !== 'scatter') {
+      anchor = sym.id;
+      break;
+    }
+  }
+
+  // If all wilds, treat as wild match.
+  if (anchor === null) {
+    anchor = 'wild';
+  }
+
+  // Count consecutive matches from left (wilds count as matches).
+  let count = 0;
+  for (const sym of lineSymbols) {
+    if (sym.id === anchor || sym.id === 'wild') {
+      count++;
+    } else {
+      break;
+    }
+  }
+
+  if (count < 3) return null;
+
+  const payoutEntry = PAYOUTS[anchor];
+  if (!payoutEntry) return null;
+
+  const multiplier = payoutEntry[count] || 0;
+  if (multiplier === 0) return null;
+
+  return { symbol: anchor, count, multiplier };
+}
+
+/**
+ * Counts scatter symbols across the entire grid.
+ * @param {object[][]} grid - 5x3 grid.
+ * @returns {number}
+ */
+function countScatters(grid) {
+  let count = 0;
+  for (const reel of grid) {
+    for (const sym of reel) {
+      if (sym.id === 'scatter') count++;
+    }
+  }
+  return count;
+}
+
+// ─── Free Spins ─────────────────────────────────────────────────────────────
+
+const FREE_SPIN_TABLE = {
+  3: { spins: 8,  multiplier: 2 },
+  4: { spins: 12, multiplier: 3 },
+  5: { spins: 15, multiplier: 5 },
+};
+
+/**
+ * Runs a batch of free spins internally and returns the total winnings.
+ *
+ * @param {string} userId
+ * @param {number} bet - Original bet amount.
+ * @param {number} spins - Number of free spins.
+ * @param {number} freeMultiplier - Multiplier applied to all free spin wins.
+ * @returns {{ totalWin: number, spinResults: object[] }}
+ */
+function runFreeSpins(userId, bet, spins, freeMultiplier) {
+  const spinResults = [];
+  let totalWin = 0;
+
+  for (let s = 0; s < spins; s++) {
+    // Spin the 5x3 grid.
+    const grid = [];
+    for (let reel = 0; reel < 5; reel++) {
+      const col = [];
+      for (let row = 0; row < 3; row++) {
+        const { result } = getNextResult(userId);
+        col.push(pickSymbol(result));
+      }
+      grid.push(col);
+    }
+
+    // Evaluate paylines.
+    let spinWin = 0;
+    const wins = [];
+    for (let i = 0; i < PAYLINES.length; i++) {
+      const hit = evaluatePayline(grid, PAYLINES[i]);
+      if (hit) {
+        const lineWin = Math.floor(bet * hit.multiplier * freeMultiplier);
+        spinWin += lineWin;
+        wins.push({ payline: i, ...hit, payout: lineWin });
+      }
+    }
+
+    totalWin += spinWin;
+    spinResults.push({
+      grid: grid.map((reel) => reel.map((s) => s.id)),
+      wins,
+      spinWin,
+    });
+  }
+
+  return { totalWin, spinResults };
+}
+
+// ─── Main Game ──────────────────────────────────────────────────────────────
+
+/**
+ * Spins the 5-reel slot machine. Uses provably fair results for each cell
+ * of the 5x3 grid (15 results total).
  *
  * @param {string} userId - The Discord user ID.
  * @param {number} bet - The wager amount.
- * @returns {{ reels: Array<{emoji: string, name: string}>, won: boolean, multiplier: number, payout: number, newBalance: number, nonce: number, serverSeedHash: string }}
+ * @returns {object} Full game result.
  */
 const playSlots = (userId, bet) => {
   // Deduct the bet atomically.
   updateBalance(userId, -bet, 'slots bet');
 
-  // Spin 3 reels using 3 sequential provably fair results.
-  const r1 = getNextResult(userId);
-  const r2 = getNextResult(userId);
-  const r3 = getNextResult(userId);
+  // Spin the 5x3 grid (5 reels, 3 rows).
+  const grid = [];
+  let firstNonce = null;
+  let firstHash = null;
 
-  const reels = [
-    pickSymbol(r1.result),
-    pickSymbol(r2.result),
-    pickSymbol(r3.result),
-  ];
-
-  // Determine payout.
-  let multiplier = 0;
-  const names = reels.map((r) => r.name);
-
-  if (names[0] === names[1] && names[1] === names[2]) {
-    // Three of a kind.
-    multiplier = PAYOUTS[names[0]] || 1;
-  } else if (names[0] === names[1] || names[1] === names[2] || names[0] === names[2]) {
-    // Two of a kind -- find the matching symbol.
-    let matchName;
-    if (names[0] === names[1]) matchName = names[0];
-    else if (names[1] === names[2]) matchName = names[1];
-    else matchName = names[0];
-    multiplier = (PAYOUTS[matchName] || 1) * TWO_MATCH_MULTIPLIER;
+  for (let reel = 0; reel < 5; reel++) {
+    const col = [];
+    for (let row = 0; row < 3; row++) {
+      const { result, nonce, serverSeedHash } = getNextResult(userId);
+      if (reel === 0 && row === 0) {
+        firstNonce = nonce;
+        firstHash = serverSeedHash;
+      }
+      col.push(pickSymbol(result));
+    }
+    grid.push(col);
   }
 
-  const won = multiplier > 0;
-  const payout = won ? Math.floor(bet * multiplier) : 0;
+  // Evaluate all paylines.
+  const paylineWins = [];
+  let baseWin = 0;
+
+  for (let i = 0; i < PAYLINES.length; i++) {
+    const hit = evaluatePayline(grid, PAYLINES[i]);
+    if (hit) {
+      const lineWin = Math.floor(bet * hit.multiplier);
+      baseWin += lineWin;
+      paylineWins.push({ payline: i, ...hit, payout: lineWin });
+    }
+  }
+
+  // Check for scatter bonus (free spins).
+  const scatterCount = countScatters(grid);
+  let freeSpinResult = null;
+
+  if (scatterCount >= 3) {
+    const fsConfig = FREE_SPIN_TABLE[Math.min(scatterCount, 5)];
+    freeSpinResult = runFreeSpins(userId, bet, fsConfig.spins, fsConfig.multiplier);
+    baseWin += freeSpinResult.totalWin;
+  }
+
+  // Contribute to the progressive jackpot pool.
+  contributeToJackpot(bet);
+
+  // Check for progressive jackpot trigger.
+  let jackpotWin = null;
+  if (checkJackpotTrigger(bet)) {
+    jackpotWin = awardJackpot(userId, userId);
+    baseWin += jackpotWin.amount;
+  }
+
+  const won = baseWin > 0;
+  const payout = baseWin;
   let newBalance;
 
   if (won && payout > 0) {
-    newBalance = updateBalance(userId, payout, 'slots win');
+    newBalance = updateBalance(userId, payout, jackpotWin ? 'slots jackpot' : 'slots win');
   } else {
     newBalance = getBalance(userId);
   }
 
+  // Determine the best single payline win for display purposes.
+  let bestWin = null;
+  if (paylineWins.length > 0) {
+    bestWin = paylineWins.reduce((a, b) => (a.payout > b.payout ? a : b));
+  }
+
+  // Check for jackpot-tier wins.
+  const isJackpot = jackpotWin !== null || (bestWin && bestWin.count === 5 && bestWin.symbol === 'wild');
+  const isBigWin = payout >= bet * 20;
+  const isMegaWin = payout >= bet * 50;
+
   recordGame(userId, 'slots', bet, payout, won, JSON.stringify({
-    reels: reels.map((r) => r.name), multiplier,
+    grid: grid.map((reel) => reel.map((s) => s.id)),
+    paylineWins: paylineWins.length,
+    scatterCount,
+    freeSpins: freeSpinResult ? freeSpinResult.spinResults.length : 0,
+    jackpotWin: jackpotWin ? jackpotWin.amount : 0,
   }));
 
   const vipResult = addWagered(userId, bet);
 
   return {
-    reels,
+    grid,
+    paylineWins,
+    bestWin,
+    scatterCount,
+    freeSpinResult,
+    jackpotWin,
     won,
-    multiplier,
     payout,
     newBalance,
-    nonce: r1.nonce,
-    serverSeedHash: r1.serverSeedHash,
+    isJackpot,
+    isBigWin,
+    isMegaWin,
+    nonce: firstNonce,
+    serverSeedHash: firstHash,
     vipLevelUp: vipResult.newLevel,
   };
 };
 
-module.exports = { playSlots };
+module.exports = {
+  playSlots,
+  SYMBOLS,
+  WILD,
+  SCATTER,
+  REEL_SYMBOLS,
+  PAYOUTS,
+  PAYLINES,
+  FREE_SPIN_TABLE,
+};
